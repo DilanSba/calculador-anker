@@ -1,13 +1,13 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { 
-  Search, 
-  ShoppingCart, 
-  Trash2, 
-  Plus, 
-  Minus, 
-  Copy, 
-  RotateCcw, 
-  CreditCard, 
+import {
+  Search,
+  ShoppingCart,
+  Trash2,
+  Plus,
+  Minus,
+  Copy,
+  RotateCcw,
+  CreditCard,
   DollarSign,
   Info,
   CheckCircle2,
@@ -16,10 +16,13 @@ import {
   Calculator,
   User,
   Share2,
-  Zap
+  Zap,
+  FileDown
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { PRODUCTS, Product } from './constants';
+import { usePDFCotizacion } from './hooks/usePDFCotizacion';
+import CotizacionModal from './components/CotizacionModal';
 
 interface CartItem {
   id: string;
@@ -41,6 +44,8 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [isErrorState, setIsErrorState] = useState(false);
+  const [showPDFModal, setShowPDFModal] = useState(false);
+  const { downloadPDF, isGenerating } = usePDFCotizacion();
 
   // Splash screen timeout
   useEffect(() => {
@@ -758,21 +763,29 @@ export default function App() {
                     </div>
                   )}
 
-                  <div className="grid grid-cols-2 gap-2">
-                    <button 
+                  <div className="grid grid-cols-3 gap-2">
+                    <button
                       onClick={resetCart}
                       className="flex items-center justify-center gap-2 py-2.5 bg-slate-50 hover:bg-red-50 text-slate-400 hover:text-red-500 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
                     >
                       <Trash2 size={14} />
                       Vaciar
                     </button>
-                    <button 
+                    <button
                       onClick={copySummary}
                       disabled={totals.lines === 0}
                       className="flex items-center justify-center gap-2 py-2.5 bg-blue-200 hover:bg-blue-300 text-blue-700 disabled:opacity-50 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
                     >
                       <Copy size={14} />
                       Copiar
+                    </button>
+                    <button
+                      onClick={() => setShowPDFModal(true)}
+                      disabled={totals.lines === 0}
+                      className="flex items-center justify-center gap-1.5 py-2.5 bg-emerald-900 hover:bg-emerald-700 text-emerald-300 disabled:opacity-50 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                    >
+                      <FileDown size={14} />
+                      PDF
                     </button>
                   </div>
 
@@ -808,6 +821,29 @@ export default function App() {
             </motion.div>
           )}
         </AnimatePresence>
+
+        <CotizacionModal
+          isOpen={showPDFModal}
+          onClose={() => setShowPDFModal(false)}
+          isGenerating={isGenerating}
+          onConfirm={(formData) => {
+            downloadPDF({
+              cartItems: Object.values(cart).map(item => {
+                const p = PRODUCTS.find(x => x.id === item.id)!;
+                return { id: p.id, name: p.name, qty: item.qty, unitPrice: getUnitPrice(p) };
+              }),
+              priceMode,
+              syncTerm,
+              downPayment,
+              totalFinanced: totals.totalFinanced,
+              monthlyPayment: totals.total,
+              totalCash: totals.baseAmount,
+              consultor: formData.consultor,
+              cliente: formData.cliente,
+            });
+            setShowPDFModal(false);
+          }}
+        />
 
         {/* Footer Info */}
         <footer className="max-w-7xl mx-auto px-4 py-8 text-center space-y-6">
