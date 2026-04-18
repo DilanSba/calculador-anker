@@ -83,7 +83,7 @@ export default function App() {
 
   const addToCart = (id: string) => {
     // Compatibility Logic
-    const incompatibleWith3800 = ['PANEL_200W', 'PANEL_200W_50', 'TRANSFER_SWITH_MANUAL', 'TRANSFER_SWITH_MANUAL_APTO'];
+    const incompatibleWith3800 = ['PANEL_200W', 'PANEL_200W_50'];
     
     if (id === 'ANKER_SOLIX_3800') {
       const hasIncompatible = incompatibleWith3800.some(itemId => cart[itemId]);
