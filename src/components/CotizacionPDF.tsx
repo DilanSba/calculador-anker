@@ -2,6 +2,12 @@
 import { Document, Page, View, Text, Image, StyleSheet } from '@react-pdf/renderer';
 import React from 'react';
 
+export interface PlanDetail {
+  baseAmount: number;
+  totalFinanced: number;
+  monthly: number;
+}
+
 export interface CotizacionPDFProps {
   cartItems: Array<{ id: string; name: string; qty: number; unitPrice: number; }>;
   priceMode: 'cash' | 'sync';
@@ -12,6 +18,11 @@ export interface CotizacionPDFProps {
   totalCash: number;
   consultor: { nombre: string; correo: string; telefono: string; };
   cliente: { nombre: string; correo: string; telefono: string; direccion: string; };
+  allPlans?: {
+    term12: PlanDetail;
+    term24: PlanDetail;
+    term48: PlanDetail;
+  };
 }
 
 const BLUE = '#00AEEF';
@@ -172,6 +183,59 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontFamily: 'Helvetica-Bold',
   },
+  // Plans comparison
+  plansRow: {
+    flexDirection: 'row',
+    gap: 4,
+    marginTop: 4,
+  },
+  planBox: {
+    flex: 1,
+    borderRadius: 4,
+    padding: 6,
+    alignItems: 'center',
+  },
+  planBoxActive: {
+    backgroundColor: BLUE,
+  },
+  planBoxInactive: {
+    backgroundColor: ROW_ODD,
+  },
+  planLabel: {
+    fontSize: 7,
+    fontFamily: 'Helvetica-Bold',
+    letterSpacing: 0.5,
+    marginBottom: 3,
+    textAlign: 'center',
+  },
+  planLabelActive: {
+    color: TEXT_MAIN,
+  },
+  planLabelInactive: {
+    color: TEXT_SEC,
+  },
+  planAmount: {
+    fontSize: 10,
+    fontFamily: 'Helvetica-Bold',
+    textAlign: 'center',
+  },
+  planAmountActive: {
+    color: TEXT_MAIN,
+  },
+  planAmountInactive: {
+    color: TEXT_MAIN,
+  },
+  planSub: {
+    fontSize: 6,
+    textAlign: 'center',
+    marginTop: 2,
+  },
+  planSubActive: {
+    color: 'rgba(255,255,255,0.8)',
+  },
+  planSubInactive: {
+    color: TEXT_SEC,
+  },
   // Disclaimer
   disclaimer: {
     color: TEXT_SEC,
@@ -209,6 +273,7 @@ export default function CotizacionPDF(props: CotizacionPDFProps) {
     totalCash,
     consultor,
     cliente,
+    allPlans,
   } = props;
 
   const cotizacionNum = 'WH-' + Date.now();
@@ -340,8 +405,8 @@ export default function CotizacionPDF(props: CotizacionPDFProps) {
             ) : (
               <>
                 <View style={[styles.totalRow, { backgroundColor: ROW_ODD }]}>
-                  <Text style={styles.totalLabel}>TOTAL FINANCIADO</Text>
-                  <Text style={styles.totalValue}>{fmt(totalCash)}</Text>
+                  <Text style={styles.totalLabel}>PRECIO LISTA (CASH)</Text>
+                  <Text style={styles.totalValue}>{fmt(allPlans ? allPlans.term12.baseAmount : totalCash)}</Text>
                 </View>
                 {downPayment > 0 && (
                   <>
@@ -349,22 +414,76 @@ export default function CotizacionPDF(props: CotizacionPDFProps) {
                       <Text style={styles.totalLabel}>DOWN PAYMENT</Text>
                       <Text style={styles.totalValue}>{fmt(downPayment)}</Text>
                     </View>
-                    <View style={[styles.totalRow, { backgroundColor: ROW_ODD }]}>
-                      <Text style={styles.totalLabel}>BALANCE A FINANCIAR</Text>
-                      <Text style={styles.totalValue}>{fmt(totalFinanced)}</Text>
-                    </View>
                   </>
                 )}
-                <View style={styles.totalHighlightRow}>
-                  <Text style={styles.totalHighlightLabel}>
-                    {'CUOTA MENSUAL (' + syncTerm + 'm)'}
-                  </Text>
-                  <Text style={styles.totalHighlightValue}>{fmt(monthlyPayment) + '/mes'}</Text>
-                </View>
               </>
             )}
           </View>
         </View>
+
+        {/* FINANCING PLANS COMPARISON — only in sync mode */}
+        {priceMode === 'sync' && allPlans && (
+          <View style={{ marginBottom: 14 }}>
+            <View style={[styles.totalRow, { backgroundColor: ROW_ODD, borderRadius: 4, marginBottom: 4 }]}>
+              <Text style={[styles.totalLabel, { fontSize: 8 }]}>OPCIONES DE FINANCIAMIENTO SYNCHRONY</Text>
+            </View>
+            <View style={styles.plansRow}>
+              {/* 12 MESES */}
+              <View style={[styles.planBox, syncTerm === '12' ? styles.planBoxActive : styles.planBoxInactive]}>
+                <Text style={[styles.planLabel, syncTerm === '12' ? styles.planLabelActive : styles.planLabelInactive]}>
+                  12 MESES{'\n'}(0% INT)
+                </Text>
+                <Text style={[styles.planAmount, syncTerm === '12' ? styles.planAmountActive : styles.planAmountInactive]}>
+                  {fmt(allPlans.term12.monthly)}
+                </Text>
+                <Text style={[styles.planSub, syncTerm === '12' ? styles.planSubActive : styles.planSubInactive]}>
+                  /mes
+                </Text>
+                {downPayment > 0 && (
+                  <Text style={[styles.planSub, syncTerm === '12' ? styles.planSubActive : styles.planSubInactive]}>
+                    {'Fin: ' + fmt(allPlans.term12.totalFinanced)}
+                  </Text>
+                )}
+              </View>
+
+              {/* 24 MESES */}
+              <View style={[styles.planBox, syncTerm === '24' ? styles.planBoxActive : styles.planBoxInactive]}>
+                <Text style={[styles.planLabel, syncTerm === '24' ? styles.planLabelActive : styles.planLabelInactive]}>
+                  24 MESES{'\n'}(ESTÁNDAR)
+                </Text>
+                <Text style={[styles.planAmount, syncTerm === '24' ? styles.planAmountActive : styles.planAmountInactive]}>
+                  {fmt(allPlans.term24.monthly)}
+                </Text>
+                <Text style={[styles.planSub, syncTerm === '24' ? styles.planSubActive : styles.planSubInactive]}>
+                  /mes
+                </Text>
+                {downPayment > 0 && (
+                  <Text style={[styles.planSub, syncTerm === '24' ? styles.planSubActive : styles.planSubInactive]}>
+                    {'Fin: ' + fmt(allPlans.term24.totalFinanced)}
+                  </Text>
+                )}
+              </View>
+
+              {/* 48 MESES */}
+              <View style={[styles.planBox, syncTerm === '48' ? styles.planBoxActive : styles.planBoxInactive]}>
+                <Text style={[styles.planLabel, syncTerm === '48' ? styles.planLabelActive : styles.planLabelInactive]}>
+                  48 MESES{'\n'}(MÍNIMA)
+                </Text>
+                <Text style={[styles.planAmount, syncTerm === '48' ? styles.planAmountActive : styles.planAmountInactive]}>
+                  {fmt(allPlans.term48.monthly)}
+                </Text>
+                <Text style={[styles.planSub, syncTerm === '48' ? styles.planSubActive : styles.planSubInactive]}>
+                  /mes
+                </Text>
+                {downPayment > 0 && (
+                  <Text style={[styles.planSub, syncTerm === '48' ? styles.planSubActive : styles.planSubInactive]}>
+                    {'Fin: ' + fmt(allPlans.term48.totalFinanced)}
+                  </Text>
+                )}
+              </View>
+            </View>
+          </View>
+        )}
 
         {/* DISCLAIMER */}
         <Text style={styles.disclaimer}>

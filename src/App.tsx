@@ -827,8 +827,21 @@ export default function App() {
           onClose={() => setShowPDFModal(false)}
           isGenerating={isGenerating}
           onConfirm={(formData) => {
+            const cartArr = Object.values(cart) as CartItem[];
+            const totalCashVal = cartArr.reduce((acc, it) => {
+              const p = PRODUCTS.find(x => x.id === it.id)!;
+              return acc + p.cash * it.qty;
+            }, 0);
+            const totalSyncVal = cartArr.reduce((acc, it) => {
+              const p = PRODUCTS.find(x => x.id === it.id)!;
+              return acc + p.syncPrice * it.qty;
+            }, 0);
+            const tf12 = Math.max(0, totalCashVal - downPayment);
+            const tf24 = Math.max(0, totalSyncVal - downPayment);
+            const tf48 = Math.max(0, totalSyncVal - downPayment);
+
             downloadPDF({
-              cartItems: Object.values(cart).map(item => {
+              cartItems: cartArr.map(item => {
                 const p = PRODUCTS.find(x => x.id === item.id)!;
                 return { id: p.id, name: p.name, qty: item.qty, unitPrice: getUnitPrice(p) };
               }),
@@ -840,6 +853,11 @@ export default function App() {
               totalCash: totals.baseAmount,
               consultor: formData.consultor,
               cliente: formData.cliente,
+              allPlans: {
+                term12: { baseAmount: totalCashVal, totalFinanced: tf12, monthly: tf12 / 12 },
+                term24: { baseAmount: totalSyncVal, totalFinanced: tf24, monthly: tf24 / 24 },
+                term48: { baseAmount: totalSyncVal, totalFinanced: tf48, monthly: tf48 / 48 },
+              },
             });
             setShowPDFModal(false);
           }}
