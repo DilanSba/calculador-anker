@@ -405,8 +405,8 @@ export default function CotizacionPDF(props: CotizacionPDFProps) {
             ) : (
               <>
                 <View style={[styles.totalRow, { backgroundColor: ROW_ODD }]}>
-                  <Text style={styles.totalLabel}>PRECIO LISTA (CASH)</Text>
-                  <Text style={styles.totalValue}>{fmt(allPlans ? allPlans.term12.baseAmount : totalCash)}</Text>
+                  <Text style={styles.totalLabel}>PRECIO SYNCHRONY</Text>
+                  <Text style={styles.totalValue}>{fmt(allPlans ? allPlans.term24.baseAmount : totalCash)}</Text>
                 </View>
                 {downPayment > 0 && (
                   <>
