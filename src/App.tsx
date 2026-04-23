@@ -11,12 +11,9 @@ import {
   DollarSign,
   Info,
   CheckCircle2,
-  ChevronRight,
   Package,
-  Calculator,
   User,
   Share2,
-  Zap,
   FileDown
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -37,7 +34,7 @@ const currencyFormatter = new Intl.NumberFormat('en-US', {
 export default function App() {
   const [cart, setCart] = useState<Record<string, CartItem>>({});
   const [searchQuery, setSearchQuery] = useState('');
-  const [priceMode, setPriceMode] = useState<'cash' | 'sync'>('cash');
+  const [priceMode, setPriceMode] = useState<'cash' | 'sync' | 'homedepot'>('cash');
   const [syncTerm, setSyncTerm] = useState<'12' | '24' | '48'>('12');
   const [downPayment, setDownPayment] = useState<number>(0);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
@@ -47,13 +44,11 @@ export default function App() {
   const [showPDFModal, setShowPDFModal] = useState(false);
   const { downloadPDF, isGenerating } = usePDFCotizacion();
 
-  // Splash screen timeout
   useEffect(() => {
     const timer = setTimeout(() => setIsLoading(false), 3500);
     return () => clearTimeout(timer);
   }, []);
 
-  // Load cart from local storage
   useEffect(() => {
     const saved = localStorage.getItem('anker_cart_v5');
     if (saved) {
@@ -67,7 +62,6 @@ export default function App() {
     }
   }, []);
 
-  // Save cart to local storage
   useEffect(() => {
     localStorage.setItem('anker_cart_v5', JSON.stringify({ cart, downPayment }));
   }, [cart, downPayment]);
@@ -82,9 +76,8 @@ export default function App() {
   };
 
   const addToCart = (id: string) => {
-    // Compatibility Logic
     const incompatibleWith3800 = ['PANEL_200W', 'PANEL_200W_50'];
-    
+
     if (id === 'ANKER_SOLIX_3800') {
       const hasIncompatible = incompatibleWith3800.some(itemId => cart[itemId]);
       if (hasIncompatible) {
@@ -100,7 +93,6 @@ export default function App() {
       }
     }
 
-    // Compatibility Logic for F2600/BP2600 and Automatic Transfer Switch
     const autoTransferSwitches = ['TRANSFER_SWITH_AUTOMATICO', 'TRANSFER_SWITH_AUTOMATICO_APTO'];
     const incompatibleWithAutoTransfer = ['ANKER_SOLIX_F2600', 'EXPANSION_BATTERY_BP2600'];
 
@@ -140,10 +132,7 @@ export default function App() {
       const current = prev[id];
       if (!current) return prev;
       const nextQty = Math.max(1, current.qty + delta);
-      return {
-        ...prev,
-        [id]: { ...current, qty: nextQty }
-      };
+      return { ...prev, [id]: { ...current, qty: nextQty } };
     });
   };
 
@@ -154,14 +143,16 @@ export default function App() {
   };
 
   const filteredProducts = useMemo(() => {
-    return PRODUCTS.filter(p => 
+    return PRODUCTS.filter(p =>
       p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       p.category.toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [searchQuery]);
 
+  const isCashLike = priceMode === 'cash' || priceMode === 'homedepot';
+
   const getUnitPrice = (p: Product) => {
-    if (priceMode === 'cash') return p.cash;
+    if (isCashLike) return p.cash;
     if (syncTerm === '12') return p.pay12;
     if (syncTerm === '24') return p.pay24;
     return p.pay48;
@@ -169,27 +160,24 @@ export default function App() {
 
   const totals = useMemo(() => {
     const items = Object.values(cart) as CartItem[];
-    
-    // Total Cash
+
     const totalCash = items.reduce((acc, it) => {
       const p = PRODUCTS.find(x => x.id === it.id);
       return acc + (p ? p.cash * it.qty : 0);
     }, 0);
 
-    // Total Sync Price (The full price if financed)
     const totalSyncPrice = items.reduce((acc, it) => {
       const p = PRODUCTS.find(x => x.id === it.id);
       return acc + (p ? p.syncPrice * it.qty : 0);
     }, 0);
 
-    let total = 0; // This will be the "Main Total" (Cash Total or Monthly Payment)
-    let totalFinanced = 0; // This will be the "Total Financed" (Total Sync Price - Down Payment)
+    let total = 0;
+    let totalFinanced = 0;
 
-    if (priceMode === 'cash') {
+    if (isCashLike) {
       total = totalCash;
       totalFinanced = totalCash;
     } else {
-      // Financing mode
       const term = parseInt(syncTerm);
       const baseAmount = syncTerm === '12' ? totalCash : totalSyncPrice;
       totalFinanced = Math.max(0, baseAmount - downPayment);
@@ -197,15 +185,18 @@ export default function App() {
     }
 
     const count = items.reduce((acc, it) => acc + it.qty, 0);
-    return { total, totalFinanced, count, lines: items.length, baseAmount: priceMode === 'cash' ? totalCash : (syncTerm === '12' ? totalCash : totalSyncPrice) };
+    const baseAmount = isCashLike ? totalCash : (syncTerm === '12' ? totalCash : totalSyncPrice);
+    return { total, totalFinanced, count, lines: items.length, baseAmount };
   }, [cart, priceMode, syncTerm, downPayment]);
 
   const copySummary = async () => {
     const items = Object.values(cart) as CartItem[];
-    const header = priceMode === 'cash' 
-      ? 'Modo: PRECIO / CASH' 
-      : `Modo: PRECIO CON SYNCHRONY · ${syncTerm} meses (pago mensual)`;
-    
+    const modeLabel = priceMode === 'cash'
+      ? 'PRECIO / CASH'
+      : priceMode === 'homedepot'
+      ? 'PRECIO / HOME DEPOT'
+      : `PRECIO CON SYNCHRONY · ${syncTerm} meses (pago mensual)`;
+
     const lines = items.map(it => {
       const p = PRODUCTS.find(x => x.id === it.id);
       if (!p) return '';
@@ -217,22 +208,28 @@ export default function App() {
       return line;
     }).join('\n');
 
-    let summaryText = `Cotización Anker Pro\n${header}\n\n${lines}\n\n`;
-    
+    let summaryText = `Cotización Anker Pro\nModo: ${modeLabel}\n\n${lines}\n\n`;
+
     if (priceMode === 'sync' && downPayment > 0) {
       summaryText += `PRONTO (Down Payment): ${currencyFormatter.format(downPayment)}\n`;
       summaryText += `BALANCE A FINANCIAR: ${currencyFormatter.format(totals.totalFinanced)}\n\n`;
     }
 
-    summaryText += `${priceMode === 'cash' ? 'TOTAL' : 'TOTAL FINANCIADO'}: ${currencyFormatter.format(priceMode === 'cash' ? totals.total : totals.totalFinanced)}${priceMode === 'sync' ? `\nCUOTA MENSUAL (${syncTerm}m): ${currencyFormatter.format(totals.total)}` : ''}\n\nGenerado por Windmar Home`;
+    summaryText += `${isCashLike ? 'TOTAL' : 'TOTAL FINANCIADO'}: ${currencyFormatter.format(isCashLike ? totals.total : totals.totalFinanced)}`;
+    if (priceMode === 'sync') {
+      summaryText += `\nCUOTA MENSUAL (${syncTerm}m): ${currencyFormatter.format(totals.total)}`;
+    }
+    summaryText += '\n\nGenerado por Windmar Home';
 
     try {
       await navigator.clipboard.writeText(summaryText);
       showToast('Resumen copiado al portapapeles');
-    } catch (err) {
+    } catch {
       showToast('Error al copiar', 'error');
     }
   };
+
+  const bigCardIds = ['ANKER_SOLIX_3800', 'PANEL_400W', 'PANEL_400W_50', 'TRANSFER_SWITH_MANUAL', 'TRANSFER_SWITH_AUTOMATICO', 'TRANSFER_SWITH_MANUAL_APTO', 'TRANSFER_SWITH_AUTOMATICO_APTO'];
 
   return (
     <>
@@ -245,26 +242,17 @@ export default function App() {
             transition={{ duration: 0.8, ease: "easeInOut" }}
             className="fixed inset-0 z-[100] bg-slate-950 flex flex-col items-center justify-center p-6 overflow-hidden"
           >
-            {/* Energy Background Effect */}
             <div className="absolute inset-0">
-              <motion.div 
-                animate={{ 
-                  scale: [1, 1.2, 1],
-                  opacity: [0.1, 0.3, 0.1]
-                }}
+              <motion.div
+                animate={{ scale: [1, 1.2, 1], opacity: [0.1, 0.3, 0.1] }}
                 transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
                 className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-windmar-blue rounded-full blur-[150px]"
               />
-              <motion.div 
-                animate={{ 
-                  scale: [1, 1.3, 1],
-                  opacity: [0.1, 0.2, 0.1]
-                }}
+              <motion.div
+                animate={{ scale: [1, 1.3, 1], opacity: [0.1, 0.2, 0.1] }}
                 transition={{ duration: 5, repeat: Infinity, ease: "easeInOut", delay: 1 }}
                 className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-windmar-orange rounded-full blur-[120px]"
               />
-              
-              {/* Electric Sparks - Shooting from center to outside */}
               {[...Array(40)].map((_, i) => {
                 const angle = (i / 40) * Math.PI * 2;
                 const distance = 400 + Math.random() * 300;
@@ -273,18 +261,13 @@ export default function App() {
                   <motion.div
                     key={i}
                     initial={{ opacity: 0, scale: 0 }}
-                    animate={{ 
+                    animate={{
                       opacity: [0, 1, 0],
                       scale: [0.5, 1.2, 0.5],
                       x: [Math.cos(angle) * startOffset, Math.cos(angle) * distance],
                       y: [Math.sin(angle) * startOffset, Math.sin(angle) * distance]
                     }}
-                    transition={{ 
-                      duration: 0.6 + Math.random() * 0.4,
-                      repeat: Infinity,
-                      delay: Math.random() * 2,
-                      ease: "easeOut"
-                    }}
+                    transition={{ duration: 0.6 + Math.random() * 0.4, repeat: Infinity, delay: Math.random() * 2, ease: "easeOut" }}
                     className="absolute top-1/2 left-1/2 w-0.5 h-4 bg-blue-400 rounded-full blur-[1px] shadow-[0_0_15px_#60a5fa]"
                     style={{ rotate: `${(angle * 180) / Math.PI + 90}deg` }}
                   />
@@ -294,108 +277,41 @@ export default function App() {
 
             <div className="relative z-10 flex flex-col items-center">
               <div className="flex flex-col items-center gap-8 mb-12">
-                {/* Windmar Logo - Drops down with zoom */}
                 <motion.div
                   initial={{ y: -300, scale: 0.3, opacity: 0 }}
                   animate={{ y: 0, scale: 1, opacity: 1 }}
-                  transition={{ 
-                    duration: 1.5, 
-                    ease: [0.22, 1, 0.36, 1],
-                    type: "spring",
-                    damping: 12
-                  }}
+                  transition={{ duration: 1.5, ease: [0.22, 1, 0.36, 1], type: "spring", damping: 12 }}
                   className="w-48 md:w-64 relative"
                 >
-                  <motion.div
-                    animate={{ opacity: [0, 0.5, 0] }}
-                    transition={{ duration: 2, repeat: Infinity }}
-                    className="absolute inset-0 bg-white blur-2xl rounded-full"
-                  />
-                  <img 
-                    src="https://i.postimg.cc/44pJ0vXw/logo.png" 
-                    alt="Windmar Home" 
-                    className="w-full h-auto object-contain relative z-10"
-                    referrerPolicy="no-referrer"
-                  />
+                  <motion.div animate={{ opacity: [0, 0.5, 0] }} transition={{ duration: 2, repeat: Infinity }} className="absolute inset-0 bg-white blur-2xl rounded-full" />
+                  <img src="https://i.postimg.cc/44pJ0vXw/logo.png" alt="Windmar Home" className="w-full h-auto object-contain relative z-10" referrerPolicy="no-referrer" />
                 </motion.div>
 
-                {/* Central Energy Core */}
                 <div className="relative h-24 flex items-center justify-center">
-                  <motion.div
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    transition={{ delay: 1, duration: 0.5 }}
-                    className="relative"
-                  >
-                    <motion.div
-                      animate={{ 
-                        scale: [1, 2, 1],
-                        opacity: [0.3, 0.7, 0.3],
-                        rotate: 360
-                      }}
-                      transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
-                      className="absolute inset-0 w-16 h-16 -left-8 -top-8 border-2 border-dashed border-windmar-orange rounded-full blur-[2px]"
-                    />
-                    <motion.div
-                      animate={{ 
-                        scale: [1, 1.8, 1],
-                        opacity: [0.2, 0.6, 0.2],
-                        rotate: -360
-                      }}
-                      transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
-                      className="absolute inset-0 w-20 h-20 -left-10 -top-10 border border-dashed border-blue-400 rounded-full blur-[1px]"
-                    />
-                    <div className="relative z-10 flex items-center justify-center">
-                      {/* Zap icon removed */}
-                    </div>
+                  <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 1, duration: 0.5 }} className="relative">
+                    <motion.div animate={{ scale: [1, 2, 1], opacity: [0.3, 0.7, 0.3], rotate: 360 }} transition={{ duration: 3, repeat: Infinity, ease: "linear" }} className="absolute inset-0 w-16 h-16 -left-8 -top-8 border-2 border-dashed border-windmar-orange rounded-full blur-[2px]" />
+                    <motion.div animate={{ scale: [1, 1.8, 1], opacity: [0.2, 0.6, 0.2], rotate: -360 }} transition={{ duration: 4, repeat: Infinity, ease: "linear" }} className="absolute inset-0 w-20 h-20 -left-10 -top-10 border border-dashed border-blue-400 rounded-full blur-[1px]" />
+                    <div className="relative z-10 flex items-center justify-center" />
                   </motion.div>
                 </div>
 
-                {/* Anker Logo - Meets Windmar */}
                 <motion.div
                   initial={{ y: 300, scale: 0.3, opacity: 0 }}
                   animate={{ y: 0, scale: 1, opacity: 1 }}
-                  transition={{ 
-                    duration: 1.5, 
-                    ease: [0.22, 1, 0.36, 1],
-                    type: "spring",
-                    damping: 12,
-                    delay: 0.4
-                  }}
+                  transition={{ duration: 1.5, ease: [0.22, 1, 0.36, 1], type: "spring", damping: 12, delay: 0.4 }}
                   className="w-40 md:w-52 relative"
                 >
-                  <motion.div
-                    animate={{ opacity: [0, 0.4, 0] }}
-                    transition={{ duration: 2, repeat: Infinity, delay: 0.5 }}
-                    className="absolute inset-0 bg-white blur-xl rounded-full"
-                  />
-                  <img 
-                    src="https://cdn.freelogovectors.net/wp-content/uploads/2018/06/anker-logo.png" 
-                    alt="Anker" 
-                    className="w-full h-auto object-contain relative z-10"
-                    referrerPolicy="no-referrer"
-                  />
+                  <motion.div animate={{ opacity: [0, 0.4, 0] }} transition={{ duration: 2, repeat: Infinity, delay: 0.5 }} className="absolute inset-0 bg-white blur-xl rounded-full" />
+                  <img src="https://cdn.freelogovectors.net/wp-content/uploads/2018/06/anker-logo.png" alt="Anker" className="w-full h-auto object-contain relative z-10" referrerPolicy="no-referrer" />
                 </motion.div>
               </div>
 
-              {/* Loading Section */}
               <div className="flex flex-col items-center gap-4">
                 <div className="w-72 h-1.5 bg-white/5 rounded-full overflow-hidden relative border border-white/10 shadow-[0_0_15px_rgba(255,255,255,0.05)]">
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: "100%" }}
-                    transition={{ duration: 3.5, ease: "easeInOut" }}
-                    className="absolute inset-y-0 left-0 bg-gradient-to-r from-windmar-blue via-white to-windmar-orange"
-                  />
+                  <motion.div initial={{ width: 0 }} animate={{ width: "100%" }} transition={{ duration: 3.5, ease: "easeInOut" }} className="absolute inset-y-0 left-0 bg-gradient-to-r from-windmar-blue via-white to-windmar-orange" />
                 </div>
-
                 <div className="flex items-center gap-2">
-                  <motion.p 
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 1.2 }}
-                    className="text-white/70 font-black tracking-[0.4em] text-[10px] uppercase text-center"
-                  >
+                  <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.2 }} className="text-white/70 font-black tracking-[0.4em] text-[10px] uppercase text-center">
                     Cargando Cotizador <span className="text-white underline decoration-windmar-orange decoration-2 underline-offset-4">ANKER</span> Pro
                   </motion.p>
                 </div>
@@ -410,29 +326,16 @@ export default function App() {
         <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-strong">
           <div className="max-w-7xl mx-auto px-4 h-20 flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <motion.div 
-                whileHover={{ scale: 1.05 }}
-                className="w-16 h-16 md:w-20 md:h-20 bg-white rounded-2xl flex items-center justify-center overflow-hidden border border-slate-100 shadow-strong p-2"
-              >
-                <img 
-                  src="https://i.postimg.cc/44pJ0vXw/logo.png" 
-                  alt="Windmar Home" 
-                  className="w-full h-full object-contain"
-                  referrerPolicy="no-referrer"
-                />
+              <motion.div whileHover={{ scale: 1.05 }} className="w-16 h-16 md:w-20 md:h-20 bg-white rounded-2xl flex items-center justify-center overflow-hidden border border-slate-100 shadow-strong p-2">
+                <img src="https://i.postimg.cc/44pJ0vXw/logo.png" alt="Windmar Home" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
               </motion.div>
               <div>
                 <h1 className="font-black text-slate-900 text-lg md:text-xl leading-tight tracking-tight">Cotizador Anker Pro</h1>
                 <p className="text-[10px] md:text-xs text-windmar-blue font-black uppercase tracking-widest">Windmar Home Specialist Tool</p>
               </div>
             </div>
-
             <div className="flex items-center gap-2 md:gap-4">
-              <button 
-                onClick={resetCart}
-                className="p-2.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
-                title="Reiniciar cotizador"
-              >
+              <button onClick={resetCart} className="p-2.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all" title="Reiniciar cotizador">
                 <RotateCcw size={22} />
               </button>
             </div>
@@ -441,7 +344,7 @@ export default function App() {
 
         <main className="max-w-7xl mx-auto px-4 py-4 md:py-6">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-            
+
             {/* Left Column: Catalog */}
             <div className="lg:col-span-8 space-y-4">
               <section className="glass-card p-4 md:p-5 space-y-5 shadow-strong">
@@ -460,7 +363,7 @@ export default function App() {
                   </div>
                   <div className="relative w-full md:w-64">
                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                    <input 
+                    <input
                       type="text"
                       placeholder="Buscar productos..."
                       value={searchQuery}
@@ -477,13 +380,19 @@ export default function App() {
                       <DollarSign size={12} className="text-windmar-orange" /> Modo de Precio
                     </label>
                     <div className="flex p-1 bg-slate-100 rounded-xl border border-slate-200">
-                      <button 
+                      <button
                         onClick={() => setPriceMode('cash')}
                         className={`flex-1 py-2 text-[10px] font-black rounded-lg transition-all ${priceMode === 'cash' ? 'bg-white text-windmar-blue shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                       >
                         CASH
                       </button>
-                      <button 
+                      <button
+                        onClick={() => setPriceMode('homedepot')}
+                        className={`flex-1 py-2 text-[10px] font-black rounded-lg transition-all ${priceMode === 'homedepot' ? 'bg-white text-orange-500 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                      >
+                        HOME DEPOT
+                      </button>
+                      <button
                         onClick={() => setPriceMode('sync')}
                         className={`flex-1 py-2 text-[10px] font-black rounded-lg transition-all ${priceMode === 'sync' ? 'bg-white text-windmar-blue shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                       >
@@ -496,8 +405,8 @@ export default function App() {
                     <label className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2 ml-1">
                       <CreditCard size={12} className="text-windmar-orange" /> Plazo Financiamiento
                     </label>
-                    <select 
-                      disabled={priceMode === 'cash'}
+                    <select
+                      disabled={isCashLike}
                       value={syncTerm}
                       onChange={(e) => setSyncTerm(e.target.value as any)}
                       className="w-full py-2.5 px-4 bg-slate-100 border-2 border-transparent focus:bg-white focus:border-windmar-blue rounded-xl text-xs font-bold transition-all outline-none disabled:opacity-50 appearance-none cursor-pointer"
@@ -513,7 +422,7 @@ export default function App() {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <AnimatePresence mode="popLayout">
                   {filteredProducts.map(product => (
-                    <motion.div 
+                    <motion.div
                       layout
                       key={product.id}
                       initial={{ opacity: 0, y: 10 }}
@@ -525,7 +434,7 @@ export default function App() {
                         e.dataTransfer.setData('productId', product.id);
                         e.dataTransfer.effectAllowed = 'copy';
                       }}
-                      className={`glass-card p-3 flex flex-col justify-between shadow-strong hover:shadow-2xl hover:border-windmar-blue transition-all duration-300 group cursor-grab active:cursor-grabbing ${['ANKER_SOLIX_3800', 'PANEL_400W', 'PANEL_400W_50', 'TRANSFER_SWITH_MANUAL', 'TRANSFER_SWITH_AUTOMATICO', 'TRANSFER_SWITH_MANUAL_APTO', 'TRANSFER_SWITH_AUTOMATICO_APTO'].includes(product.id) ? 'border-windmar-blue/20 bg-blue-50/5' : ''}`}
+                      className={`glass-card p-3 flex flex-col justify-between shadow-strong hover:shadow-2xl hover:border-windmar-blue transition-all duration-300 group cursor-grab active:cursor-grabbing ${bigCardIds.includes(product.id) ? 'border-windmar-blue/20 bg-blue-50/5' : ''}`}
                     >
                       <div className="space-y-2">
                         <div className="flex justify-between items-start">
@@ -535,12 +444,12 @@ export default function App() {
                         </div>
 
                         {product.image && (
-                          <div className={`w-full ${['ANKER_SOLIX_3800', 'PANEL_400W', 'PANEL_400W_50', 'TRANSFER_SWITH_MANUAL', 'TRANSFER_SWITH_AUTOMATICO', 'TRANSFER_SWITH_MANUAL_APTO', 'TRANSFER_SWITH_AUTOMATICO_APTO'].includes(product.id) ? 'h-52' : 'h-44'} flex items-center justify-center overflow-hidden rounded-xl bg-white border border-slate-50 group-hover:border-windmar-blue/10 transition-all relative`}>
-                            <motion.img 
+                          <div className={`w-full ${bigCardIds.includes(product.id) ? 'h-52' : 'h-44'} flex items-center justify-center overflow-hidden rounded-xl bg-white border border-slate-50 group-hover:border-windmar-blue/10 transition-all relative`}>
+                            <motion.img
                               whileHover={{ scale: 1.05 }}
-                              src={product.image} 
+                              src={product.image}
                               alt={product.name}
-                              className={`w-full h-full object-contain relative z-10 transition-transform duration-500 ${['ANKER_SOLIX_3800', 'PANEL_400W', 'PANEL_400W_50', 'TRANSFER_SWITH_MANUAL', 'TRANSFER_SWITH_AUTOMATICO', 'TRANSFER_SWITH_MANUAL_APTO', 'TRANSFER_SWITH_AUTOMATICO_APTO'].includes(product.id) ? 'p-0 scale-125' : 'p-2'}`}
+                              className={`w-full h-full object-contain relative z-10 transition-transform duration-500 ${bigCardIds.includes(product.id) ? 'p-0 scale-125' : 'p-2'}`}
                               referrerPolicy="no-referrer"
                             />
                           </div>
@@ -552,7 +461,7 @@ export default function App() {
                         <div className="space-y-2 pt-1">
                           <div className="flex justify-between items-end">
                             <p className="text-[8px] font-black text-slate-400 uppercase tracking-[0.2em]">
-                              {priceMode === 'cash' ? 'Precio Directo' : 'Total Sync'}
+                              {priceMode === 'sync' ? 'Total Sync' : priceMode === 'homedepot' ? 'Precio Home Depot' : 'Precio Directo'}
                             </p>
                             {priceMode === 'sync' && (
                               <p className="text-[8px] font-black text-windmar-orange uppercase tracking-[0.2em]">
@@ -562,7 +471,7 @@ export default function App() {
                           </div>
                           <div className="flex justify-between items-baseline gap-2">
                             <p className="text-lg font-black text-slate-900 tracking-tight">
-                              {currencyFormatter.format(priceMode === 'cash' ? product.cash : product.syncPrice)}
+                              {currencyFormatter.format(priceMode === 'sync' ? product.syncPrice : product.cash)}
                             </p>
                             {priceMode === 'sync' && (
                               <p className="text-xs font-black text-slate-500 opacity-90">
@@ -573,7 +482,7 @@ export default function App() {
                           </div>
                         </div>
                       </div>
-                      <button 
+                      <button
                         onClick={() => addToCart(product.id)}
                         className="mt-4 w-full flex items-center justify-center gap-2 bg-slate-900 hover:bg-windmar-orange text-white py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95"
                       >
@@ -588,11 +497,8 @@ export default function App() {
 
             {/* Right Column: Cart */}
             <div className="lg:col-span-4 space-y-4">
-              <section 
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  setIsDraggingOver(true);
-                }}
+              <section
+                onDragOver={(e) => { e.preventDefault(); setIsDraggingOver(true); }}
                 onDragLeave={() => setIsDraggingOver(false)}
                 onDrop={(e) => {
                   e.preventDefault();
@@ -604,17 +510,13 @@ export default function App() {
               >
                 <AnimatePresence>
                   {isDraggingOver && (
-                    <motion.div 
+                    <motion.div
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       exit={{ opacity: 0 }}
                       className="absolute inset-0 z-50 bg-windmar-orange/80 backdrop-blur-sm rounded-2xl flex flex-col items-center justify-center gap-4 text-white border-4 border-dashed border-white/40"
                     >
-                      <motion.div
-                        animate={{ y: [0, -10, 0] }}
-                        transition={{ duration: 1.5, repeat: Infinity }}
-                        className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center"
-                      >
+                      <motion.div animate={{ y: [0, -10, 0] }} transition={{ duration: 1.5, repeat: Infinity }} className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center">
                         <Plus size={40} />
                       </motion.div>
                       <span className="font-black text-lg uppercase tracking-[0.2em]">Soltar para Agregar</span>
@@ -629,24 +531,18 @@ export default function App() {
                       RESUMEN DE COMPRA
                     </h2>
                     <p className={`text-[10px] font-black uppercase tracking-widest transition-colors ${isErrorState ? 'text-red-400' : 'text-slate-400'}`}>
-                      MODO: {priceMode === 'cash' ? 'CASH' : `SYNCHRONY ${syncTerm}M`}
+                      MODO: {priceMode === 'cash' ? 'CASH' : priceMode === 'homedepot' ? 'HOME DEPOT' : `SYNCHRONY ${syncTerm}M`}
                     </p>
                   </div>
                   <div className={`w-6 h-6 rounded-full flex items-center justify-center transition-colors ${isErrorState ? 'bg-red-600' : 'bg-windmar-blue'}`}>
-                    <span className="text-[10px] font-black text-white">
-                      {totals.count}
-                    </span>
+                    <span className="text-[10px] font-black text-white">{totals.count}</span>
                   </div>
                 </div>
 
                 <div className="p-4 overflow-y-auto space-y-3 custom-scrollbar">
                   <AnimatePresence mode="popLayout">
                     {(Object.values(cart) as CartItem[]).length === 0 ? (
-                      <motion.div 
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        className="text-center py-12 space-y-4"
-                      >
+                      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-12 space-y-4">
                         <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto text-slate-200 border border-slate-100">
                           <Package size={24} />
                         </div>
@@ -660,9 +556,8 @@ export default function App() {
                         const product = PRODUCTS.find(p => p.id === item.id);
                         if (!product) return null;
                         const unitPrice = getUnitPrice(product);
-                        
                         return (
-                          <motion.div 
+                          <motion.div
                             layout
                             key={item.id}
                             initial={{ opacity: 0, x: 20 }}
@@ -673,42 +568,27 @@ export default function App() {
                             <div className="flex gap-3">
                               {product.image && (
                                 <div className="w-12 h-12 bg-slate-50 rounded-lg flex-shrink-0 border border-slate-100 p-1">
-                                  <img 
-                                    src={product.image} 
-                                    alt={product.name} 
-                                    className="w-full h-full object-contain"
-                                    referrerPolicy="no-referrer"
-                                  />
+                                  <img src={product.image} alt={product.name} className="w-full h-full object-contain" referrerPolicy="no-referrer" />
                                 </div>
                               )}
                               <div className="flex-1 min-w-0">
                                 <div className="flex justify-between items-start gap-2">
                                   <h4 className="text-[11px] font-black text-slate-800 leading-tight flex-1 truncate">{product.name}</h4>
-                                  <button 
-                                    onClick={() => removeFromCart(item.id)}
-                                    className="p-1 text-slate-300 hover:text-red-500 transition-all"
-                                  >
+                                  <button onClick={() => removeFromCart(item.id)} className="p-1 text-slate-300 hover:text-red-500 transition-all">
                                     <Trash2 size={14} />
                                   </button>
                                 </div>
-                                
                                 <div className="flex justify-between items-center mt-2">
                                   <div className="flex items-center bg-slate-100 rounded-lg p-0.5">
-                                    <button 
-                                      onClick={() => updateQty(item.id, -1)}
-                                      className="w-6 h-6 flex items-center justify-center hover:bg-white hover:text-windmar-blue rounded-md transition-all text-slate-500"
-                                    >
+                                    <button onClick={() => updateQty(item.id, -1)} className="w-6 h-6 flex items-center justify-center hover:bg-white hover:text-windmar-blue rounded-md transition-all text-slate-500">
                                       <Minus size={10} />
                                     </button>
-                                    <span className="w-6 text-center text-[10px] font-black text-slate-700 data-value">{item.qty}</span>
-                                    <button 
-                                      onClick={() => updateQty(item.id, 1)}
-                                      className="w-6 h-6 flex items-center justify-center hover:bg-white hover:text-windmar-blue rounded-md transition-all text-slate-500"
-                                    >
+                                    <span className="w-6 text-center text-[10px] font-black text-slate-700">{item.qty}</span>
+                                    <button onClick={() => updateQty(item.id, 1)} className="w-6 h-6 flex items-center justify-center hover:bg-white hover:text-windmar-blue rounded-md transition-all text-slate-500">
                                       <Plus size={10} />
                                     </button>
                                   </div>
-                                  <p className="text-xs font-black text-slate-900 data-value tracking-tight">
+                                  <p className="text-xs font-black text-slate-900 tracking-tight">
                                     {currencyFormatter.format(unitPrice * item.qty)}
                                   </p>
                                 </div>
@@ -723,16 +603,14 @@ export default function App() {
 
                 <div className="p-5 bg-white border-t border-slate-100 space-y-4">
                   <div className="flex justify-between items-center">
-                    <span className="text-xs font-black text-slate-800 uppercase tracking-widest">
-                      TOTAL A PAGAR
-                    </span>
-                    <motion.span 
-                      key={priceMode === 'cash' ? totals.total : totals.totalFinanced}
+                    <span className="text-xs font-black text-slate-800 uppercase tracking-widest">TOTAL A PAGAR</span>
+                    <motion.span
+                      key={isCashLike ? totals.total : totals.totalFinanced}
                       initial={{ scale: 1.1, color: "#004a99" }}
                       animate={{ scale: 1, color: "#004a99" }}
                       className="text-3xl font-black tracking-tighter text-windmar-blue"
                     >
-                      {currencyFormatter.format(priceMode === 'cash' ? totals.total : totals.totalFinanced)}
+                      {currencyFormatter.format(isCashLike ? totals.total : totals.totalFinanced)}
                     </motion.span>
                   </div>
 
@@ -744,7 +622,7 @@ export default function App() {
                         </label>
                         <div className="relative">
                           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span>
-                          <input 
+                          <input
                             type="number"
                             value={downPayment || ''}
                             onChange={(e) => setDownPayment(Math.max(0, parseFloat(e.target.value) || 0))}
@@ -753,7 +631,6 @@ export default function App() {
                           />
                         </div>
                       </div>
-
                       <div className="flex justify-between items-center pt-2 border-t border-slate-50">
                         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Cuota Mensual ({syncTerm}m)</span>
                         <span className="text-sm font-black text-windmar-orange tracking-tight">
@@ -801,21 +678,19 @@ export default function App() {
           </div>
         </main>
 
-        {/* Toast Notification */}
+        {/* Toast */}
         <AnimatePresence>
           {toast && (
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: 50, x: '-50%' }}
               animate={{ opacity: 1, y: 0, x: '-50%' }}
               exit={{ opacity: 0, y: 20, x: '-50%' }}
               className={`fixed bottom-10 left-1/2 -translate-x-1/2 text-white px-8 py-4 rounded-2xl shadow-2xl flex items-center gap-4 z-50 border backdrop-blur-xl ${toast.type === 'error' ? 'bg-red-900/90 border-red-500' : 'bg-slate-900/90 border-white/10'}`}
             >
               <div className={`w-8 h-8 rounded-full flex items-center justify-center ${toast.type === 'error' ? 'bg-red-500/20' : 'bg-emerald-500/20'}`}>
-                {toast.type === 'error' ? (
-                  <Info className="text-red-400" size={20} />
-                ) : (
-                  <CheckCircle2 className="text-emerald-400" size={20} />
-                )}
+                {toast.type === 'error'
+                  ? <Info className="text-red-400" size={20} />
+                  : <CheckCircle2 className="text-emerald-400" size={20} />}
               </div>
               <span className="text-sm font-black uppercase tracking-widest">{toast.msg}</span>
             </motion.div>
@@ -828,47 +703,35 @@ export default function App() {
           isGenerating={isGenerating}
           onConfirm={(formData) => {
             const cartArr = Object.values(cart) as CartItem[];
-            const totalCashVal = cartArr.reduce((acc, it) => {
-              const p = PRODUCTS.find(x => x.id === it.id)!;
-              return acc + p.cash * it.qty;
-            }, 0);
-            const totalSyncVal = cartArr.reduce((acc, it) => {
-              const p = PRODUCTS.find(x => x.id === it.id)!;
-              return acc + p.syncPrice * it.qty;
-            }, 0);
-            const tf12 = Math.max(0, totalCashVal - downPayment);
-            const tf24 = Math.max(0, totalSyncVal - downPayment);
-            const tf48 = Math.max(0, totalSyncVal - downPayment);
-
             downloadPDF({
               cartItems: cartArr.map(item => {
                 const p = PRODUCTS.find(x => x.id === item.id)!;
-                return { id: p.id, name: p.name, qty: item.qty, unitPrice: getUnitPrice(p) };
+                return {
+                  id: p.id,
+                  name: p.name,
+                  qty: item.qty,
+                  cashPrice: p.cash,
+                  syncPrice: p.syncPrice,
+                  syncPay12: p.pay12,
+                  syncPay24: p.pay24,
+                  syncPay48: p.pay48,
+                };
               }),
-              priceMode,
-              syncTerm,
+              pdfModes: formData.pdfModes,
+              pdfSyncTerm: formData.pdfSyncTerm,
               downPayment,
-              totalFinanced: totals.totalFinanced,
-              monthlyPayment: totals.total,
-              totalCash: totals.baseAmount,
               consultor: formData.consultor,
               cliente: formData.cliente,
-              allPlans: {
-                term12: { baseAmount: totalCashVal, totalFinanced: tf12, monthly: tf12 / 12 },
-                term24: { baseAmount: totalSyncVal, totalFinanced: tf24, monthly: tf24 / 24 },
-                term48: { baseAmount: totalSyncVal, totalFinanced: tf48, monthly: tf48 / 48 },
-              },
             });
             setShowPDFModal(false);
           }}
         />
 
-        {/* Footer Info */}
         <footer className="max-w-7xl mx-auto px-4 py-8 text-center space-y-6">
           <div className="flex items-center justify-center gap-4 text-slate-200">
-            <div className="h-px w-12 bg-slate-200"></div>
+            <div className="h-px w-12 bg-slate-200" />
             <Package size={20} className="text-slate-300" />
-            <div className="h-px w-12 bg-slate-200"></div>
+            <div className="h-px w-12 bg-slate-200" />
           </div>
           <div className="space-y-2">
             <div className="max-w-lg mx-auto space-y-4">
@@ -876,7 +739,7 @@ export default function App() {
                 Herramienta de Apoyo para Ventas · Windmar Home Puerto Rico
               </p>
               <p className="text-[10px] text-slate-300 font-medium leading-relaxed">
-                © {new Date().getFullYear()} Windmar Home. Todos los derechos reservados. 
+                © {new Date().getFullYear()} Windmar Home. Todos los derechos reservados.
                 Los precios mostrados son referenciales y pueden variar según la configuración final del sistema y promociones vigentes.
               </p>
               <p className="text-[9px] text-slate-400 font-bold uppercase tracking-[0.2em] pt-4">

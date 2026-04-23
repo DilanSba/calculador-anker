@@ -2,69 +2,66 @@
 import { Document, Page, View, Text, Image, StyleSheet } from '@react-pdf/renderer';
 import React from 'react';
 
-export interface PlanDetail {
-  baseAmount: number;
-  totalFinanced: number;
-  monthly: number;
-}
+export type PdfMode = 'cash' | 'homedepot' | 'sync';
 
 export interface CotizacionPDFProps {
-  cartItems: Array<{ id: string; name: string; qty: number; unitPrice: number; }>;
-  priceMode: 'cash' | 'sync';
-  syncTerm: '12' | '24' | '48';
+  cartItems: Array<{
+    id: string;
+    name: string;
+    qty: number;
+    cashPrice: number;
+    syncPrice: number;
+    syncPay12: number;
+    syncPay24: number;
+    syncPay48: number;
+  }>;
+  pdfModes: PdfMode[];
+  pdfSyncTerm: '12' | '24' | '48';
   downPayment: number;
-  totalFinanced: number;
-  monthlyPayment: number;
-  totalCash: number;
   consultor: { nombre: string; correo: string; telefono: string; };
   cliente: { nombre: string; correo: string; telefono: string; direccion: string; };
-  allPlans?: {
-    term12: PlanDetail;
-    term24: PlanDetail;
-    term48: PlanDetail;
-  };
 }
 
-const BLUE = '#00AEEF';
-const BG = '#0A1628';
-const ROW_ODD = '#0D1F38';
-const ROW_EVEN = '#0A1628';
-const TEXT_MAIN = '#FFFFFF';
-const TEXT_SEC = '#A0AEC0';
+const BLUE       = '#00AEEF';
+const ORANGE     = '#F97316';
+const GREEN      = '#10B981';
+const BG         = '#0A1628';
+const ROW_ODD    = '#0D1F38';
+const ROW_EVEN   = '#0A1628';
+const TEXT_MAIN  = '#FFFFFF';
+const TEXT_SEC   = '#A0AEC0';
+
+const MODE_META: Record<PdfMode, { label: string; color: string }> = {
+  cash:      { label: 'CASH',       color: BLUE },
+  homedepot: { label: 'HOME DEPOT', color: ORANGE },
+  sync:      { label: 'SYNCHRONY',  color: GREEN },
+};
 
 const styles = StyleSheet.create({
   page: {
     backgroundColor: BG,
-    padding: 30,
+    padding: 28,
     fontFamily: 'Helvetica',
     fontSize: 9,
     color: TEXT_MAIN,
   },
-  // Header
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 8,
   },
-  logo: {
-    height: 50,
-    objectFit: 'contain',
-  },
+  logo: { height: 46, objectFit: 'contain' },
   ankerTitle: {
     color: BLUE,
-    fontSize: 28,
+    fontSize: 26,
     fontFamily: 'Helvetica-Bold',
     letterSpacing: 4,
   },
-  divider: {
-    height: 2,
-    backgroundColor: BLUE,
-    marginBottom: 8,
-  },
+  divider: { height: 2, backgroundColor: BLUE, marginBottom: 8 },
   cotizacionTitle: {
     color: TEXT_MAIN,
-    fontSize: 20,
+    fontSize: 18,
     fontFamily: 'Helvetica-Bold',
     textAlign: 'center',
     marginBottom: 3,
@@ -73,187 +70,87 @@ const styles = StyleSheet.create({
     color: TEXT_SEC,
     fontSize: 8,
     textAlign: 'center',
-    marginBottom: 14,
+    marginBottom: 12,
     letterSpacing: 1,
   },
-  // Data block
   dataBlock: {
     flexDirection: 'row',
     backgroundColor: ROW_ODD,
     borderRadius: 4,
     padding: 10,
-    marginBottom: 14,
+    marginBottom: 12,
     gap: 10,
   },
-  dataCol: {
-    flex: 1,
-  },
+  dataCol: { flex: 1 },
   dataColHeader: {
     color: BLUE,
     fontSize: 7,
     fontFamily: 'Helvetica-Bold',
     letterSpacing: 1,
-    marginBottom: 6,
-    textTransform: 'uppercase',
+    marginBottom: 5,
   },
-  dataRow: {
-    flexDirection: 'row',
-    marginBottom: 3,
-    alignItems: 'flex-start',
-  },
-  dataLabel: {
-    color: TEXT_SEC,
-    fontSize: 7,
-    width: 60,
-    flexShrink: 0,
-  },
-  dataValue: {
-    color: TEXT_MAIN,
-    fontSize: 8,
-    fontFamily: 'Helvetica-Bold',
-    flex: 1,
-  },
-  // Table
+  dataRow: { flexDirection: 'row', marginBottom: 3, alignItems: 'flex-start' },
+  dataLabel: { color: TEXT_SEC, fontSize: 7, width: 62, flexShrink: 0 },
+  dataValue: { color: TEXT_MAIN, fontSize: 8, fontFamily: 'Helvetica-Bold', flex: 1 },
   tableHeader: {
     flexDirection: 'row',
-    backgroundColor: BLUE,
     paddingHorizontal: 6,
     paddingVertical: 5,
     borderRadius: 3,
     marginBottom: 1,
-  },
-  tableHeaderCell: {
-    color: TEXT_MAIN,
-    fontSize: 9,
-    fontFamily: 'Helvetica-Bold',
-  },
-  tableRow: {
-    flexDirection: 'row',
-    paddingHorizontal: 6,
-    paddingVertical: 4,
-  },
-  tableCell: {
-    color: TEXT_MAIN,
-    fontSize: 8,
-  },
-  colProduct: { width: '45%' },
-  colUnitPrice: { width: '20%' },
-  colQty: { width: '10%', textAlign: 'center' },
-  colTotal: { width: '25%', textAlign: 'right' },
-  // Totals
-  totalsWrapper: {
-    alignItems: 'flex-end',
-    marginTop: 8,
-    marginBottom: 14,
-  },
-  totalsBox: {
-    width: '55%',
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  totalRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
-  totalLabel: {
-    color: TEXT_SEC,
-    fontSize: 8,
-  },
-  totalValue: {
-    color: TEXT_MAIN,
-    fontSize: 8,
-    fontFamily: 'Helvetica-Bold',
-  },
-  totalHighlightRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
     backgroundColor: BLUE,
   },
-  totalHighlightLabel: {
-    color: TEXT_MAIN,
-    fontSize: 9,
-    fontFamily: 'Helvetica-Bold',
-  },
-  totalHighlightValue: {
-    color: TEXT_MAIN,
-    fontSize: 9,
-    fontFamily: 'Helvetica-Bold',
-  },
-  // Plans comparison
-  plansRow: {
-    flexDirection: 'row',
-    gap: 4,
-    marginTop: 4,
-  },
-  planBox: {
-    flex: 1,
-    borderRadius: 4,
-    padding: 6,
+  tableHeaderCell: { color: TEXT_MAIN, fontSize: 8, fontFamily: 'Helvetica-Bold' },
+  tableRow: { flexDirection: 'row', paddingHorizontal: 6, paddingVertical: 4 },
+  tableCell: { color: TEXT_MAIN, fontSize: 7.5 },
+  totalsSection: { marginTop: 10, marginBottom: 12 },
+  totalsRow: { flexDirection: 'row', gap: 6 },
+  totalBox: { flex: 1, borderRadius: 4, overflow: 'hidden' },
+  totalBoxHeader: {
+    paddingHorizontal: 8,
+    paddingVertical: 5,
     alignItems: 'center',
   },
-  planBoxActive: {
-    backgroundColor: BLUE,
-  },
-  planBoxInactive: {
-    backgroundColor: ROW_ODD,
-  },
-  planLabel: {
-    fontSize: 7,
+  totalBoxHeaderText: {
+    color: TEXT_MAIN,
+    fontSize: 8,
     fontFamily: 'Helvetica-Bold',
     letterSpacing: 0.5,
-    marginBottom: 3,
     textAlign: 'center',
   },
-  planLabelActive: {
-    color: TEXT_MAIN,
+  totalBoxRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: ROW_ODD,
   },
-  planLabelInactive: {
-    color: TEXT_SEC,
+  totalBoxLabel: { color: TEXT_SEC, fontSize: 7 },
+  totalBoxValue: { color: TEXT_MAIN, fontSize: 7, fontFamily: 'Helvetica-Bold' },
+  totalBoxHighlight: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
   },
-  planAmount: {
-    fontSize: 10,
-    fontFamily: 'Helvetica-Bold',
-    textAlign: 'center',
-  },
-  planAmountActive: {
-    color: TEXT_MAIN,
-  },
-  planAmountInactive: {
-    color: TEXT_MAIN,
-  },
-  planSub: {
-    fontSize: 6,
-    textAlign: 'center',
-    marginTop: 2,
-  },
-  planSubActive: {
-    color: 'rgba(255,255,255,0.8)',
-  },
-  planSubInactive: {
-    color: TEXT_SEC,
-  },
-  // Disclaimer
+  totalBoxHighlightLabel: { color: TEXT_MAIN, fontSize: 9, fontFamily: 'Helvetica-Bold' },
+  totalBoxHighlightValue: { color: TEXT_MAIN, fontSize: 9, fontFamily: 'Helvetica-Bold' },
   disclaimer: {
     color: TEXT_SEC,
     fontSize: 7,
     textAlign: 'center',
-    marginBottom: 10,
+    marginBottom: 8,
     lineHeight: 1.5,
   },
-  // Footer
   footer: {
     backgroundColor: BLUE,
     borderRadius: 4,
-    paddingVertical: 6,
+    paddingVertical: 5,
     paddingHorizontal: 10,
   },
   footerText: {
     color: TEXT_MAIN,
-    fontSize: 8,
+    fontSize: 7.5,
     textAlign: 'center',
     fontFamily: 'Helvetica-Bold',
     letterSpacing: 0.5,
@@ -263,31 +160,45 @@ const styles = StyleSheet.create({
 const fmt = (n: number) => '$' + n.toFixed(2);
 
 export default function CotizacionPDF(props: CotizacionPDFProps) {
-  const {
-    cartItems,
-    priceMode,
-    syncTerm,
-    downPayment,
-    totalFinanced,
-    monthlyPayment,
-    totalCash,
-    consultor,
-    cliente,
-    allPlans,
-  } = props;
+  const { cartItems, pdfModes, pdfSyncTerm, downPayment, consultor, cliente } = props;
 
   const cotizacionNum = 'WH-' + Date.now();
   const fechaStr = new Date().toLocaleDateString('es-PR');
+  const isSingle = pdfModes.length === 1;
+
+  const getSyncMonthly = (item: typeof cartItems[0]) => {
+    if (pdfSyncTerm === '12') return item.syncPay12;
+    if (pdfSyncTerm === '24') return item.syncPay24;
+    return item.syncPay48;
+  };
+
+  const getModeUnitPrice = (item: typeof cartItems[0], mode: PdfMode) => {
+    if (mode === 'cash' || mode === 'homedepot') return item.cashPrice;
+    return getSyncMonthly(item);
+  };
+
+  const getModeLabel = (mode: PdfMode) => {
+    if (mode === 'sync') return `SYNC ${pdfSyncTerm}M`;
+    return MODE_META[mode].label;
+  };
+
+  const getModeGrandTotal = (mode: PdfMode) =>
+    cartItems.reduce((acc, item) => acc + getModeUnitPrice(item, mode) * item.qty, 0);
+
+  // Column widths for the table
+  const numModes = pdfModes.length;
+  const productColW = isSingle ? '44%' : numModes === 2 ? '38%' : '32%';
+  const qtyColW = '8%';
+  const remainingPct = isSingle ? 48 : numModes === 2 ? 54 : 60;
+  const modeColW = (remainingPct / numModes).toFixed(1) + '%';
 
   return (
     <Document>
       <Page size="LETTER" style={styles.page}>
+
         {/* HEADER */}
         <View style={styles.headerRow}>
-          <Image
-            src="https://i.postimg.cc/44pJ0vXw/logo.png"
-            style={styles.logo}
-          />
+          <Image src="https://i.postimg.cc/44pJ0vXw/logo.png" style={styles.logo} />
           <Text style={styles.ankerTitle}>ANKER</Text>
         </View>
         <View style={styles.divider} />
@@ -296,7 +207,6 @@ export default function CotizacionPDF(props: CotizacionPDFProps) {
 
         {/* DATA BLOCK */}
         <View style={styles.dataBlock}>
-          {/* LEFT: Consultor */}
           <View style={styles.dataCol}>
             <Text style={styles.dataColHeader}>CONSULTOR</Text>
             <View style={styles.dataRow}>
@@ -315,7 +225,7 @@ export default function CotizacionPDF(props: CotizacionPDFProps) {
                 <Text style={styles.dataValue}>{consultor.telefono}</Text>
               </View>
             ) : null}
-            <View style={{ marginTop: 8 }}>
+            <View style={{ marginTop: 6 }}>
               <View style={styles.dataRow}>
                 <Text style={styles.dataLabel}>N° Cotización:</Text>
                 <Text style={styles.dataValue}>{cotizacionNum}</Text>
@@ -327,7 +237,6 @@ export default function CotizacionPDF(props: CotizacionPDFProps) {
             </View>
           </View>
 
-          {/* RIGHT: Cliente */}
           <View style={styles.dataCol}>
             <Text style={styles.dataColHeader}>CLIENTE</Text>
             <View style={styles.dataRow}>
@@ -352,7 +261,7 @@ export default function CotizacionPDF(props: CotizacionPDFProps) {
                 <Text style={styles.dataValue}>{cliente.direccion}</Text>
               </View>
             ) : null}
-            <View style={{ marginTop: 8 }}>
+            <View style={{ marginTop: 6 }}>
               <View style={styles.dataRow}>
                 <Text style={styles.dataLabel}>Validez:</Text>
                 <Text style={styles.dataValue}>30 días</Text>
@@ -362,128 +271,119 @@ export default function CotizacionPDF(props: CotizacionPDFProps) {
         </View>
 
         {/* PRODUCTS TABLE */}
-        <View style={styles.tableHeader}>
-          <Text style={[styles.tableHeaderCell, styles.colProduct]}>PRODUCTO</Text>
-          <Text style={[styles.tableHeaderCell, styles.colUnitPrice]}>PRECIO UNIT</Text>
-          <Text style={[styles.tableHeaderCell, styles.colQty]}>CANT</Text>
-          <Text style={[styles.tableHeaderCell, styles.colTotal]}>TOTAL</Text>
-        </View>
-
-        {cartItems.map((item, idx) => {
-          const rowBg = idx % 2 === 0 ? ROW_ODD : ROW_EVEN;
-          const unitDisplay =
-            priceMode === 'sync'
-              ? fmt(item.unitPrice) + '/mes'
-              : fmt(item.unitPrice);
-          const lineTotal = item.unitPrice * item.qty;
-
-          return (
-            <View
-              key={item.id}
-              style={[styles.tableRow, { backgroundColor: rowBg }]}
-            >
-              <Text style={[styles.tableCell, styles.colProduct]}>{item.name}</Text>
-              <Text style={[styles.tableCell, styles.colUnitPrice]}>{unitDisplay}</Text>
-              <Text style={[styles.tableCell, styles.colQty]}>{item.qty}</Text>
-              <Text style={[styles.tableCell, styles.colTotal]}>
-                {priceMode === 'sync'
-                  ? fmt(lineTotal) + '/mes'
-                  : fmt(lineTotal)}
+        {isSingle ? (
+          /* ─── SINGLE MODE: classic layout ─── */
+          <>
+            <View style={styles.tableHeader}>
+              <Text style={[styles.tableHeaderCell, { width: '44%' }]}>PRODUCTO</Text>
+              <Text style={[styles.tableHeaderCell, { width: '20%' }]}>
+                {getModeLabel(pdfModes[0]) + (pdfModes[0] === 'sync' ? '/MES' : '')}
               </Text>
+              <Text style={[styles.tableHeaderCell, { width: '10%', textAlign: 'center' }]}>CANT</Text>
+              <Text style={[styles.tableHeaderCell, { width: '26%', textAlign: 'right' }]}>TOTAL</Text>
             </View>
-          );
-        })}
+            {cartItems.map((item, idx) => {
+              const unit = getModeUnitPrice(item, pdfModes[0]);
+              const total = unit * item.qty;
+              const isSync = pdfModes[0] === 'sync';
+              const bg = idx % 2 === 0 ? ROW_ODD : ROW_EVEN;
+              return (
+                <View key={item.id} style={[styles.tableRow, { backgroundColor: bg }]}>
+                  <Text style={[styles.tableCell, { width: '44%' }]}>{item.name}</Text>
+                  <Text style={[styles.tableCell, { width: '20%' }]}>{fmt(unit)}{isSync ? '/m' : ''}</Text>
+                  <Text style={[styles.tableCell, { width: '10%', textAlign: 'center' }]}>{item.qty}</Text>
+                  <Text style={[styles.tableCell, { width: '26%', textAlign: 'right' }]}>{fmt(total)}{isSync ? '/m' : ''}</Text>
+                </View>
+              );
+            })}
+          </>
+        ) : (
+          /* ─── MULTI MODE: one column per mode ─── */
+          <>
+            <View style={styles.tableHeader}>
+              <Text style={[styles.tableHeaderCell, { width: productColW }]}>PRODUCTO</Text>
+              <Text style={[styles.tableHeaderCell, { width: qtyColW, textAlign: 'center' }]}>CANT</Text>
+              {pdfModes.map(mode => (
+                <Text
+                  key={mode}
+                  style={[styles.tableHeaderCell, { width: modeColW, textAlign: 'right', color: MODE_META[mode].color }]}
+                >
+                  {getModeLabel(mode)}{mode === 'sync' ? '/m' : ''}
+                </Text>
+              ))}
+            </View>
+            {cartItems.map((item, idx) => {
+              const bg = idx % 2 === 0 ? ROW_ODD : ROW_EVEN;
+              return (
+                <View key={item.id} style={[styles.tableRow, { backgroundColor: bg }]}>
+                  <Text style={[styles.tableCell, { width: productColW }]}>{item.name}</Text>
+                  <Text style={[styles.tableCell, { width: qtyColW, textAlign: 'center' }]}>{item.qty}</Text>
+                  {pdfModes.map(mode => {
+                    const unit = getModeUnitPrice(item, mode);
+                    return (
+                      <Text
+                        key={mode}
+                        style={[styles.tableCell, { width: modeColW, textAlign: 'right' }]}
+                      >
+                        {fmt(unit * item.qty)}{mode === 'sync' ? '/m' : ''}
+                      </Text>
+                    );
+                  })}
+                </View>
+              );
+            })}
+          </>
+        )}
 
         {/* TOTALS */}
-        <View style={styles.totalsWrapper}>
-          <View style={styles.totalsBox}>
-            {priceMode === 'cash' ? (
-              <View style={styles.totalHighlightRow}>
-                <Text style={styles.totalHighlightLabel}>TOTAL CASH</Text>
-                <Text style={styles.totalHighlightValue}>{fmt(totalCash)}</Text>
-              </View>
-            ) : (
-              <>
-                <View style={[styles.totalRow, { backgroundColor: ROW_ODD }]}>
-                  <Text style={styles.totalLabel}>PRECIO SYNCHRONY</Text>
-                  <Text style={styles.totalValue}>{fmt(allPlans ? allPlans.term24.baseAmount : totalCash)}</Text>
+        <View style={styles.totalsSection}>
+          <View style={styles.totalsRow}>
+            {pdfModes.map(mode => {
+              const grandTotal = getModeGrandTotal(mode);
+              const modeColor = MODE_META[mode].color;
+              const isSync = mode === 'sync';
+              const syncTotalBase = cartItems.reduce((acc, it) => acc + it.syncPrice * it.qty, 0);
+              const financed = isSync ? Math.max(0, syncTotalBase - downPayment) : 0;
+
+              return (
+                <View key={mode} style={styles.totalBox}>
+                  {/* Box header with mode color */}
+                  <View style={[styles.totalBoxHeader, { backgroundColor: modeColor }]}>
+                    <Text style={styles.totalBoxHeaderText}>{getModeLabel(mode)}</Text>
+                  </View>
+
+                  {/* Sub rows */}
+                  {isSync && downPayment > 0 && (
+                    <>
+                      <View style={styles.totalBoxRow}>
+                        <Text style={styles.totalBoxLabel}>Precio Sync</Text>
+                        <Text style={styles.totalBoxValue}>{fmt(syncTotalBase)}</Text>
+                      </View>
+                      <View style={[styles.totalBoxRow, { backgroundColor: ROW_EVEN }]}>
+                        <Text style={styles.totalBoxLabel}>Down Payment</Text>
+                        <Text style={styles.totalBoxValue}>{fmt(downPayment)}</Text>
+                      </View>
+                      <View style={styles.totalBoxRow}>
+                        <Text style={styles.totalBoxLabel}>A financiar</Text>
+                        <Text style={styles.totalBoxValue}>{fmt(financed)}</Text>
+                      </View>
+                    </>
+                  )}
+
+                  {/* Highlight total */}
+                  <View style={[styles.totalBoxHighlight, { backgroundColor: modeColor }]}>
+                    <Text style={styles.totalBoxHighlightLabel}>
+                      {isSync ? `CUOTA ${pdfSyncTerm}M` : 'TOTAL'}
+                    </Text>
+                    <Text style={styles.totalBoxHighlightValue}>
+                      {fmt(grandTotal)}{isSync ? '/m' : ''}
+                    </Text>
+                  </View>
                 </View>
-                {downPayment > 0 && (
-                  <>
-                    <View style={[styles.totalRow, { backgroundColor: ROW_EVEN }]}>
-                      <Text style={styles.totalLabel}>DOWN PAYMENT</Text>
-                      <Text style={styles.totalValue}>{fmt(downPayment)}</Text>
-                    </View>
-                  </>
-                )}
-              </>
-            )}
+              );
+            })}
           </View>
         </View>
-
-        {/* FINANCING PLANS COMPARISON — only in sync mode */}
-        {priceMode === 'sync' && allPlans && (
-          <View style={{ marginBottom: 14 }}>
-            <View style={[styles.totalRow, { backgroundColor: ROW_ODD, borderRadius: 4, marginBottom: 4 }]}>
-              <Text style={[styles.totalLabel, { fontSize: 8 }]}>OPCIONES DE FINANCIAMIENTO SYNCHRONY</Text>
-            </View>
-            <View style={styles.plansRow}>
-              {/* 12 MESES */}
-              <View style={[styles.planBox, syncTerm === '12' ? styles.planBoxActive : styles.planBoxInactive]}>
-                <Text style={[styles.planLabel, syncTerm === '12' ? styles.planLabelActive : styles.planLabelInactive]}>
-                  12 MESES{'\n'}(0% INT)
-                </Text>
-                <Text style={[styles.planAmount, syncTerm === '12' ? styles.planAmountActive : styles.planAmountInactive]}>
-                  {fmt(allPlans.term12.monthly)}
-                </Text>
-                <Text style={[styles.planSub, syncTerm === '12' ? styles.planSubActive : styles.planSubInactive]}>
-                  /mes
-                </Text>
-                {downPayment > 0 && (
-                  <Text style={[styles.planSub, syncTerm === '12' ? styles.planSubActive : styles.planSubInactive]}>
-                    {'Fin: ' + fmt(allPlans.term12.totalFinanced)}
-                  </Text>
-                )}
-              </View>
-
-              {/* 24 MESES */}
-              <View style={[styles.planBox, syncTerm === '24' ? styles.planBoxActive : styles.planBoxInactive]}>
-                <Text style={[styles.planLabel, syncTerm === '24' ? styles.planLabelActive : styles.planLabelInactive]}>
-                  24 MESES{'\n'}(ESTÁNDAR)
-                </Text>
-                <Text style={[styles.planAmount, syncTerm === '24' ? styles.planAmountActive : styles.planAmountInactive]}>
-                  {fmt(allPlans.term24.monthly)}
-                </Text>
-                <Text style={[styles.planSub, syncTerm === '24' ? styles.planSubActive : styles.planSubInactive]}>
-                  /mes
-                </Text>
-                {downPayment > 0 && (
-                  <Text style={[styles.planSub, syncTerm === '24' ? styles.planSubActive : styles.planSubInactive]}>
-                    {'Fin: ' + fmt(allPlans.term24.totalFinanced)}
-                  </Text>
-                )}
-              </View>
-
-              {/* 48 MESES */}
-              <View style={[styles.planBox, syncTerm === '48' ? styles.planBoxActive : styles.planBoxInactive]}>
-                <Text style={[styles.planLabel, syncTerm === '48' ? styles.planLabelActive : styles.planLabelInactive]}>
-                  48 MESES{'\n'}(MÍNIMA)
-                </Text>
-                <Text style={[styles.planAmount, syncTerm === '48' ? styles.planAmountActive : styles.planAmountInactive]}>
-                  {fmt(allPlans.term48.monthly)}
-                </Text>
-                <Text style={[styles.planSub, syncTerm === '48' ? styles.planSubActive : styles.planSubInactive]}>
-                  /mes
-                </Text>
-                {downPayment > 0 && (
-                  <Text style={[styles.planSub, syncTerm === '48' ? styles.planSubActive : styles.planSubInactive]}>
-                    {'Fin: ' + fmt(allPlans.term48.totalFinanced)}
-                  </Text>
-                )}
-              </View>
-            </View>
-          </View>
-        )}
 
         {/* DISCLAIMER */}
         <Text style={styles.disclaimer}>

@@ -1,9 +1,13 @@
 import React, { useState } from 'react';
-import { X, User, Briefcase, Loader2 } from 'lucide-react';
+import { X, User, Briefcase, Loader2, FileText } from 'lucide-react';
+
+export type PdfMode = 'cash' | 'homedepot' | 'sync';
 
 export interface FormData {
   consultor: { nombre: string; correo: string; telefono: string; };
   cliente: { nombre: string; correo: string; telefono: string; direccion: string; };
+  pdfModes: PdfMode[];
+  pdfSyncTerm: '12' | '24' | '48';
 }
 
 interface CotizacionModalProps {
@@ -16,11 +20,19 @@ interface CotizacionModalProps {
 const emptyForm: FormData = {
   consultor: { nombre: '', correo: '', telefono: '' },
   cliente: { nombre: '', correo: '', telefono: '', direccion: '' },
+  pdfModes: ['cash'],
+  pdfSyncTerm: '12',
 };
+
+const MODE_OPTIONS: { id: PdfMode; label: string; color: string; border: string }[] = [
+  { id: 'cash',      label: 'CASH',       color: 'bg-[#00AEEF]/20 text-[#00AEEF]', border: 'border-[#00AEEF]' },
+  { id: 'homedepot', label: 'HOME DEPOT', color: 'bg-orange-500/20 text-orange-400', border: 'border-orange-500' },
+  { id: 'sync',      label: 'SYNCHRONY',  color: 'bg-emerald-500/20 text-emerald-400', border: 'border-emerald-500' },
+];
 
 export default function CotizacionModal({ isOpen, onClose, onConfirm, isGenerating }: CotizacionModalProps) {
   const [form, setForm] = useState<FormData>(emptyForm);
-  const [errors, setErrors] = useState<{ consultor?: string; cliente?: string }>({});
+  const [errors, setErrors] = useState<{ consultor?: string; cliente?: string; pdfModes?: string }>({});
 
   if (!isOpen) return null;
 
@@ -34,10 +46,21 @@ export default function CotizacionModal({ isOpen, onClose, onConfirm, isGenerati
     if (key === 'nombre' && value.trim()) setErrors(prev => ({ ...prev, cliente: undefined }));
   };
 
+  const toggleMode = (mode: PdfMode) => {
+    setForm(prev => {
+      const has = prev.pdfModes.includes(mode);
+      if (has && prev.pdfModes.length === 1) return prev; // at least one required
+      const next = has ? prev.pdfModes.filter(m => m !== mode) : [...prev.pdfModes, mode];
+      return { ...prev, pdfModes: next };
+    });
+    setErrors(prev => ({ ...prev, pdfModes: undefined }));
+  };
+
   const handleConfirm = () => {
     const newErrors: typeof errors = {};
     if (!form.consultor.nombre.trim()) newErrors.consultor = 'Nombre del consultor requerido';
     if (!form.cliente.nombre.trim()) newErrors.cliente = 'Nombre del cliente requerido';
+    if (form.pdfModes.length === 0) newErrors.pdfModes = 'Selecciona al menos un modo de pago';
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       return;
@@ -48,8 +71,10 @@ export default function CotizacionModal({ isOpen, onClose, onConfirm, isGenerati
   const labelClass = "block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1";
   const inputClass = "bg-slate-800 border border-slate-700 focus:border-[#00AEEF] rounded-xl px-3 py-2.5 text-white text-sm w-full outline-none transition-all";
 
+  const syncSelected = form.pdfModes.includes('sync');
+
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center">
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center overflow-y-auto py-4">
       <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-2xl w-full mx-4 shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
@@ -162,6 +187,67 @@ export default function CotizacionModal({ isOpen, onClose, onConfirm, isGenerati
               />
             </div>
           </div>
+        </div>
+
+        {/* PDF Modes Section */}
+        <div className="mt-6 pt-5 border-t border-slate-700 space-y-3">
+          <div className="flex items-center gap-2">
+            <FileText size={14} className="text-[#00AEEF]" />
+            <span className="text-[11px] font-black text-[#00AEEF] uppercase tracking-widest">Modos de Pago en el PDF</span>
+          </div>
+          <p className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">
+            Selecciona uno o más modos — el PDF mostrará los precios de cada uno
+          </p>
+
+          <div className="flex gap-3 flex-wrap">
+            {MODE_OPTIONS.map(opt => {
+              const active = form.pdfModes.includes(opt.id);
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => toggleMode(opt.id)}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 text-[10px] font-black uppercase tracking-widest transition-all ${
+                    active
+                      ? `${opt.color} ${opt.border}`
+                      : 'bg-slate-800 text-slate-500 border-slate-700 hover:border-slate-500'
+                  }`}
+                >
+                  <span className={`w-3 h-3 rounded border-2 flex items-center justify-center flex-shrink-0 ${active ? opt.border : 'border-slate-600'}`}>
+                    {active && <span className="w-1.5 h-1.5 rounded-sm bg-current" />}
+                  </span>
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {errors.pdfModes && (
+            <p className="text-red-400 text-[10px] font-bold">{errors.pdfModes}</p>
+          )}
+
+          {/* Sync term selector — only when SYNCHRONY is checked */}
+          {syncSelected && (
+            <div className="mt-2 space-y-1">
+              <label className={labelClass}>Plazo Synchrony en PDF</label>
+              <div className="flex gap-2">
+                {(['12', '24', '48'] as const).map(term => (
+                  <button
+                    key={term}
+                    type="button"
+                    onClick={() => setForm(prev => ({ ...prev, pdfSyncTerm: term }))}
+                    className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border-2 transition-all ${
+                      form.pdfSyncTerm === term
+                        ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500'
+                        : 'bg-slate-800 text-slate-500 border-slate-700 hover:border-slate-500'
+                    }`}
+                  >
+                    {term}M {term === '12' ? '(0% Int)' : term === '24' ? 'Estándar' : 'Mínima'}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Buttons */}
