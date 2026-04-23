@@ -7,7 +7,7 @@ export interface FormData {
   consultor: { nombre: string; correo: string; telefono: string; };
   cliente: { nombre: string; correo: string; telefono: string; direccion: string; };
   pdfModes: PdfMode[];
-  pdfSyncTerm: '12' | '24' | '48';
+  pdfSyncTerms: ('12' | '24' | '48')[];
 }
 
 interface CotizacionModalProps {
@@ -21,7 +21,7 @@ const emptyForm: FormData = {
   consultor: { nombre: '', correo: '', telefono: '' },
   cliente: { nombre: '', correo: '', telefono: '', direccion: '' },
   pdfModes: ['cash'],
-  pdfSyncTerm: '12',
+  pdfSyncTerms: ['12'],
 };
 
 const MODE_OPTIONS: { id: PdfMode; label: string; color: string; border: string }[] = [
@@ -231,20 +231,33 @@ export default function CotizacionModal({ isOpen, onClose, onConfirm, isGenerati
             <div className="mt-2 space-y-1">
               <label className={labelClass}>Plazo Synchrony en PDF</label>
               <div className="flex gap-2">
-                {(['12', '24', '48'] as const).map(term => (
-                  <button
-                    key={term}
-                    type="button"
-                    onClick={() => setForm(prev => ({ ...prev, pdfSyncTerm: term }))}
-                    className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border-2 transition-all ${
-                      form.pdfSyncTerm === term
-                        ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500'
-                        : 'bg-slate-800 text-slate-500 border-slate-700 hover:border-slate-500'
-                    }`}
-                  >
-                    {term}M {term === '12' ? '(0% Int)' : term === '24' ? 'Estándar' : 'Mínima'}
-                  </button>
-                ))}
+                {(['12', '24', '48'] as const).map(term => {
+                  const active = form.pdfSyncTerms.includes(term);
+                  return (
+                    <button
+                      key={term}
+                      type="button"
+                      onClick={() => setForm(prev => {
+                        const has = prev.pdfSyncTerms.includes(term);
+                        if (has && prev.pdfSyncTerms.length === 1) return prev;
+                        const next = has
+                          ? prev.pdfSyncTerms.filter(t => t !== term)
+                          : [...prev.pdfSyncTerms, term];
+                        return { ...prev, pdfSyncTerms: next };
+                      })}
+                      className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border-2 transition-all flex items-center justify-center gap-1.5 ${
+                        active
+                          ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500'
+                          : 'bg-slate-800 text-slate-500 border-slate-700 hover:border-slate-500'
+                      }`}
+                    >
+                      <span className={`w-2.5 h-2.5 rounded border flex items-center justify-center flex-shrink-0 ${active ? 'border-emerald-400' : 'border-slate-600'}`}>
+                        {active && <span className="w-1.5 h-1.5 rounded-sm bg-emerald-400" />}
+                      </span>
+                      {term}M {term === '12' ? '(0%)' : term === '24' ? 'Est.' : 'Mín.'}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}

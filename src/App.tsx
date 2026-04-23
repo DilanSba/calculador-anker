@@ -718,7 +718,7 @@ export default function App() {
                 };
               }),
               pdfModes: formData.pdfModes,
-              pdfSyncTerm: formData.pdfSyncTerm,
+              pdfSyncTerms: formData.pdfSyncTerms,
               downPayment,
               consultor: formData.consultor,
               cliente: formData.cliente,

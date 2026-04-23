@@ -16,7 +16,7 @@ export interface CotizacionPDFProps {
     syncPay48: number;
   }>;
   pdfModes: PdfMode[];
-  pdfSyncTerm: '12' | '24' | '48';
+  pdfSyncTerms: ('12' | '24' | '48')[];
   downPayment: number;
   consultor: { nombre: string; correo: string; telefono: string; };
   cliente: { nombre: string; correo: string; telefono: string; direccion: string; };
@@ -159,38 +159,45 @@ const styles = StyleSheet.create({
 
 const fmt = (n: number) => '$' + n.toFixed(2);
 
+type EffCol = { key: string; label: string; color: string; isSyncMode: boolean; syncTerm?: '12' | '24' | '48' };
+
 export default function CotizacionPDF(props: CotizacionPDFProps) {
-  const { cartItems, pdfModes, pdfSyncTerm, downPayment, consultor, cliente } = props;
+  const { cartItems, pdfModes, pdfSyncTerms, downPayment, consultor, cliente } = props;
 
   const cotizacionNum = 'WH-' + Date.now();
   const fechaStr = new Date().toLocaleDateString('es-PR');
-  const isSingle = pdfModes.length === 1;
 
-  const getSyncMonthly = (item: typeof cartItems[0]) => {
-    if (pdfSyncTerm === '12') return item.syncPay12;
-    if (pdfSyncTerm === '24') return item.syncPay24;
+  // Expand pdfModes: each 'sync' entry becomes one column per selected term
+  const effCols: EffCol[] = pdfModes.flatMap(mode => {
+    if (mode === 'sync') {
+      return pdfSyncTerms.map(t => ({
+        key: `sync-${t}`,
+        label: `SYNC ${t}M`,
+        color: GREEN,
+        isSyncMode: true,
+        syncTerm: t,
+      }));
+    }
+    return [{ key: mode, label: MODE_META[mode].label, color: MODE_META[mode].color, isSyncMode: false }];
+  });
+
+  const isSingle = effCols.length === 1;
+
+  const getColPrice = (item: typeof cartItems[0], col: EffCol) => {
+    if (!col.isSyncMode) return item.cashPrice;
+    if (col.syncTerm === '12') return item.syncPay12;
+    if (col.syncTerm === '24') return item.syncPay24;
     return item.syncPay48;
   };
 
-  const getModeUnitPrice = (item: typeof cartItems[0], mode: PdfMode) => {
-    if (mode === 'cash' || mode === 'homedepot') return item.cashPrice;
-    return getSyncMonthly(item);
-  };
+  const getColGrandTotal = (col: EffCol) =>
+    cartItems.reduce((acc, item) => acc + getColPrice(item, col) * item.qty, 0);
 
-  const getModeLabel = (mode: PdfMode) => {
-    if (mode === 'sync') return `SYNC ${pdfSyncTerm}M`;
-    return MODE_META[mode].label;
-  };
-
-  const getModeGrandTotal = (mode: PdfMode) =>
-    cartItems.reduce((acc, item) => acc + getModeUnitPrice(item, mode) * item.qty, 0);
-
-  // Column widths for the table
-  const numModes = pdfModes.length;
-  const productColW = isSingle ? '44%' : numModes === 2 ? '38%' : '32%';
+  const numCols = effCols.length;
+  const productColW = isSingle ? '44%' : numCols === 2 ? '38%' : numCols === 3 ? '32%' : '28%';
   const qtyColW = '8%';
-  const remainingPct = isSingle ? 48 : numModes === 2 ? 54 : 60;
-  const modeColW = (remainingPct / numModes).toFixed(1) + '%';
+  const remainingPct = isSingle ? 48 : numCols === 2 ? 54 : numCols === 3 ? 60 : 64;
+  const modeColW = (remainingPct / numCols).toFixed(1) + '%';
 
   return (
     <Document>
@@ -272,43 +279,39 @@ export default function CotizacionPDF(props: CotizacionPDFProps) {
 
         {/* PRODUCTS TABLE */}
         {isSingle ? (
-          /* ─── SINGLE MODE: classic layout ─── */
+          /* ─── SINGLE COLUMN: classic layout ─── */
           <>
             <View style={styles.tableHeader}>
               <Text style={[styles.tableHeaderCell, { width: '44%' }]}>PRODUCTO</Text>
               <Text style={[styles.tableHeaderCell, { width: '20%' }]}>
-                {getModeLabel(pdfModes[0]) + (pdfModes[0] === 'sync' ? '/MES' : '')}
+                {effCols[0].label}{effCols[0].isSyncMode ? '/MES' : ''}
               </Text>
               <Text style={[styles.tableHeaderCell, { width: '10%', textAlign: 'center' }]}>CANT</Text>
               <Text style={[styles.tableHeaderCell, { width: '26%', textAlign: 'right' }]}>TOTAL</Text>
             </View>
             {cartItems.map((item, idx) => {
-              const unit = getModeUnitPrice(item, pdfModes[0]);
+              const unit = getColPrice(item, effCols[0]);
               const total = unit * item.qty;
-              const isSync = pdfModes[0] === 'sync';
               const bg = idx % 2 === 0 ? ROW_ODD : ROW_EVEN;
               return (
                 <View key={item.id} style={[styles.tableRow, { backgroundColor: bg }]}>
                   <Text style={[styles.tableCell, { width: '44%' }]}>{item.name}</Text>
-                  <Text style={[styles.tableCell, { width: '20%' }]}>{fmt(unit)}{isSync ? '/m' : ''}</Text>
+                  <Text style={[styles.tableCell, { width: '20%' }]}>{fmt(unit)}{effCols[0].isSyncMode ? '/m' : ''}</Text>
                   <Text style={[styles.tableCell, { width: '10%', textAlign: 'center' }]}>{item.qty}</Text>
-                  <Text style={[styles.tableCell, { width: '26%', textAlign: 'right' }]}>{fmt(total)}{isSync ? '/m' : ''}</Text>
+                  <Text style={[styles.tableCell, { width: '26%', textAlign: 'right' }]}>{fmt(total)}{effCols[0].isSyncMode ? '/m' : ''}</Text>
                 </View>
               );
             })}
           </>
         ) : (
-          /* ─── MULTI MODE: one column per mode ─── */
+          /* ─── MULTI COLUMN: one column per effective mode ─── */
           <>
             <View style={styles.tableHeader}>
               <Text style={[styles.tableHeaderCell, { width: productColW }]}>PRODUCTO</Text>
               <Text style={[styles.tableHeaderCell, { width: qtyColW, textAlign: 'center' }]}>CANT</Text>
-              {pdfModes.map(mode => (
-                <Text
-                  key={mode}
-                  style={[styles.tableHeaderCell, { width: modeColW, textAlign: 'right', color: MODE_META[mode].color }]}
-                >
-                  {getModeLabel(mode)}{mode === 'sync' ? '/m' : ''}
+              {effCols.map(col => (
+                <Text key={col.key} style={[styles.tableHeaderCell, { width: modeColW, textAlign: 'right', color: col.color }]}>
+                  {col.label}{col.isSyncMode ? '/m' : ''}
                 </Text>
               ))}
             </View>
@@ -318,17 +321,11 @@ export default function CotizacionPDF(props: CotizacionPDFProps) {
                 <View key={item.id} style={[styles.tableRow, { backgroundColor: bg }]}>
                   <Text style={[styles.tableCell, { width: productColW }]}>{item.name}</Text>
                   <Text style={[styles.tableCell, { width: qtyColW, textAlign: 'center' }]}>{item.qty}</Text>
-                  {pdfModes.map(mode => {
-                    const unit = getModeUnitPrice(item, mode);
-                    return (
-                      <Text
-                        key={mode}
-                        style={[styles.tableCell, { width: modeColW, textAlign: 'right' }]}
-                      >
-                        {fmt(unit * item.qty)}{mode === 'sync' ? '/m' : ''}
-                      </Text>
-                    );
-                  })}
+                  {effCols.map(col => (
+                    <Text key={col.key} style={[styles.tableCell, { width: modeColW, textAlign: 'right' }]}>
+                      {fmt(getColPrice(item, col) * item.qty)}{col.isSyncMode ? '/m' : ''}
+                    </Text>
+                  ))}
                 </View>
               );
             })}
@@ -338,22 +335,18 @@ export default function CotizacionPDF(props: CotizacionPDFProps) {
         {/* TOTALS */}
         <View style={styles.totalsSection}>
           <View style={styles.totalsRow}>
-            {pdfModes.map(mode => {
-              const grandTotal = getModeGrandTotal(mode);
-              const modeColor = MODE_META[mode].color;
-              const isSync = mode === 'sync';
+            {effCols.map(col => {
+              const grandTotal = getColGrandTotal(col);
               const syncTotalBase = cartItems.reduce((acc, it) => acc + it.syncPrice * it.qty, 0);
-              const financed = isSync ? Math.max(0, syncTotalBase - downPayment) : 0;
+              const financed = col.isSyncMode ? Math.max(0, syncTotalBase - downPayment) : 0;
 
               return (
-                <View key={mode} style={styles.totalBox}>
-                  {/* Box header with mode color */}
-                  <View style={[styles.totalBoxHeader, { backgroundColor: modeColor }]}>
-                    <Text style={styles.totalBoxHeaderText}>{getModeLabel(mode)}</Text>
+                <View key={col.key} style={styles.totalBox}>
+                  <View style={[styles.totalBoxHeader, { backgroundColor: col.color }]}>
+                    <Text style={styles.totalBoxHeaderText}>{col.label}</Text>
                   </View>
 
-                  {/* Sub rows */}
-                  {isSync && downPayment > 0 && (
+                  {col.isSyncMode && downPayment > 0 && (
                     <>
                       <View style={styles.totalBoxRow}>
                         <Text style={styles.totalBoxLabel}>Precio Sync</Text>
@@ -370,13 +363,12 @@ export default function CotizacionPDF(props: CotizacionPDFProps) {
                     </>
                   )}
 
-                  {/* Highlight total */}
-                  <View style={[styles.totalBoxHighlight, { backgroundColor: modeColor }]}>
+                  <View style={[styles.totalBoxHighlight, { backgroundColor: col.color }]}>
                     <Text style={styles.totalBoxHighlightLabel}>
-                      {isSync ? `CUOTA ${pdfSyncTerm}M` : 'TOTAL'}
+                      {col.isSyncMode ? `CUOTA ${col.syncTerm}M` : 'TOTAL'}
                     </Text>
                     <Text style={styles.totalBoxHighlightValue}>
-                      {fmt(grandTotal)}{isSync ? '/m' : ''}
+                      {fmt(grandTotal)}{col.isSyncMode ? '/m' : ''}
                     </Text>
                   </View>
                 </View>
