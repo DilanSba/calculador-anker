@@ -310,7 +310,7 @@ export default function CotizacionPDF(props: CotizacionPDFProps) {
               <Text style={[styles.tableHeaderCell, { width: productColW }]}>PRODUCTO</Text>
               <Text style={[styles.tableHeaderCell, { width: qtyColW, textAlign: 'center' }]}>CANT</Text>
               {effCols.map(col => (
-                <Text key={col.key} style={[styles.tableHeaderCell, { width: modeColW, textAlign: 'right', color: col.color }]}>
+                <Text key={col.key} style={[styles.tableHeaderCell, { width: modeColW, textAlign: 'right', color: TEXT_MAIN }]}>
                   {col.label}{col.isSyncMode ? '/m' : ''}
                 </Text>
               ))}
@@ -332,50 +332,55 @@ export default function CotizacionPDF(props: CotizacionPDFProps) {
           </>
         )}
 
-        {/* TOTALS */}
-        <View style={styles.totalsSection}>
-          <View style={styles.totalsRow}>
-            {effCols.map(col => {
-              const grandTotal = getColGrandTotal(col);
-              const syncTotalBase = cartItems.reduce((acc, it) => acc + it.syncPrice * it.qty, 0);
-              const financed = col.isSyncMode ? Math.max(0, syncTotalBase - downPayment) : 0;
-
-              return (
-                <View key={col.key} style={styles.totalBox}>
-                  <View style={[styles.totalBoxHeader, { backgroundColor: col.color }]}>
-                    <Text style={styles.totalBoxHeaderText}>{col.label}</Text>
-                  </View>
-
-                  {col.isSyncMode && downPayment > 0 && (
-                    <>
-                      <View style={styles.totalBoxRow}>
-                        <Text style={styles.totalBoxLabel}>Precio Sync</Text>
-                        <Text style={styles.totalBoxValue}>{fmt(syncTotalBase)}</Text>
+        {/* TOTALS — max 3 boxes per row */}
+        {(() => {
+          const syncTotalBase = cartItems.reduce((acc, it) => acc + it.syncPrice * it.qty, 0);
+          const chunks: EffCol[][] = [];
+          for (let i = 0; i < effCols.length; i += 3) chunks.push(effCols.slice(i, i + 3));
+          return (
+            <View style={styles.totalsSection}>
+              {chunks.map((chunk, ci) => (
+                <View key={ci} style={[styles.totalsRow, ci > 0 ? { marginTop: 6 } : {}]}>
+                  {chunk.map(col => {
+                    const grandTotal = getColGrandTotal(col);
+                    const financed = col.isSyncMode ? Math.max(0, syncTotalBase - downPayment) : 0;
+                    return (
+                      <View key={col.key} style={styles.totalBox}>
+                        <View style={[styles.totalBoxHeader, { backgroundColor: col.color }]}>
+                          <Text style={styles.totalBoxHeaderText}>{col.label}</Text>
+                        </View>
+                        {col.isSyncMode && downPayment > 0 && (
+                          <>
+                            <View style={styles.totalBoxRow}>
+                              <Text style={styles.totalBoxLabel}>Precio Sync</Text>
+                              <Text style={styles.totalBoxValue}>{fmt(syncTotalBase)}</Text>
+                            </View>
+                            <View style={[styles.totalBoxRow, { backgroundColor: ROW_EVEN }]}>
+                              <Text style={styles.totalBoxLabel}>Down Payment</Text>
+                              <Text style={styles.totalBoxValue}>{fmt(downPayment)}</Text>
+                            </View>
+                            <View style={styles.totalBoxRow}>
+                              <Text style={styles.totalBoxLabel}>A financiar</Text>
+                              <Text style={styles.totalBoxValue}>{fmt(financed)}</Text>
+                            </View>
+                          </>
+                        )}
+                        <View style={[styles.totalBoxHighlight, { backgroundColor: col.color }]}>
+                          <Text style={styles.totalBoxHighlightLabel}>
+                            {col.isSyncMode ? `CUOTA ${col.syncTerm}M` : 'TOTAL'}
+                          </Text>
+                          <Text style={styles.totalBoxHighlightValue}>
+                            {fmt(grandTotal)}{col.isSyncMode ? '/m' : ''}
+                          </Text>
+                        </View>
                       </View>
-                      <View style={[styles.totalBoxRow, { backgroundColor: ROW_EVEN }]}>
-                        <Text style={styles.totalBoxLabel}>Down Payment</Text>
-                        <Text style={styles.totalBoxValue}>{fmt(downPayment)}</Text>
-                      </View>
-                      <View style={styles.totalBoxRow}>
-                        <Text style={styles.totalBoxLabel}>A financiar</Text>
-                        <Text style={styles.totalBoxValue}>{fmt(financed)}</Text>
-                      </View>
-                    </>
-                  )}
-
-                  <View style={[styles.totalBoxHighlight, { backgroundColor: col.color }]}>
-                    <Text style={styles.totalBoxHighlightLabel}>
-                      {col.isSyncMode ? `CUOTA ${col.syncTerm}M` : 'TOTAL'}
-                    </Text>
-                    <Text style={styles.totalBoxHighlightValue}>
-                      {fmt(grandTotal)}{col.isSyncMode ? '/m' : ''}
-                    </Text>
-                  </View>
+                    );
+                  })}
                 </View>
-              );
-            })}
-          </View>
-        </View>
+              ))}
+            </View>
+          );
+        })()}
 
         {/* DISCLAIMER */}
         <Text style={styles.disclaimer}>

@@ -25,9 +25,9 @@ const emptyForm: FormData = {
 };
 
 const MODE_OPTIONS: { id: PdfMode; label: string; color: string; border: string }[] = [
-  { id: 'cash',      label: 'CASH',       color: 'bg-[#00AEEF]/20 text-[#00AEEF]', border: 'border-[#00AEEF]' },
-  { id: 'homedepot', label: 'HOME DEPOT', color: 'bg-orange-500/20 text-orange-400', border: 'border-orange-500' },
-  { id: 'sync',      label: 'SYNCHRONY',  color: 'bg-emerald-500/20 text-emerald-400', border: 'border-emerald-500' },
+  { id: 'cash',      label: 'CASH',       color: 'bg-[#00AEEF]/30 text-white', border: 'border-[#00AEEF]' },
+  { id: 'homedepot', label: 'HOME DEPOT', color: 'bg-orange-500/30 text-white', border: 'border-orange-500' },
+  { id: 'sync',      label: 'SYNCHRONY',  color: 'bg-emerald-500/30 text-white', border: 'border-emerald-500' },
 ];
 
 export default function CotizacionModal({ isOpen, onClose, onConfirm, isGenerating }: CotizacionModalProps) {
@@ -247,7 +247,7 @@ export default function CotizacionModal({ isOpen, onClose, onConfirm, isGenerati
                       })}
                       className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border-2 transition-all flex items-center justify-center gap-1.5 ${
                         active
-                          ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500'
+                          ? 'bg-emerald-500/30 text-white border-emerald-500'
                           : 'bg-slate-800 text-slate-500 border-slate-700 hover:border-slate-500'
                       }`}
                     >
