@@ -1,24 +1,44 @@
 @import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&display=swap');
+
+@custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Poppins", "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
-  
-  --color-windmar-blue: #004a99;
+
+  /* Paleta Windmar (compartida) */
+  --color-windmar-blue: #1D429B;
+  --color-windmar-blue-light: #A6C3E6;
+  --color-windmar-blue-dark: #21274e;
+  --color-windmar-gold: #F89B24;
   --color-windmar-orange: #f39200;
-  --color-windmar-blue-light: #005bb8;
-  --color-windmar-orange-light: #ff9d0a;
+
+  /* Paleta Anker (específica de este cotizador) */
+  --color-anker-blue: #00AEEF;        /* azul cyan brillante — distintivo Anker */
+  --color-anker-blue-dark: #0086B8;   /* hover/active */
+  --color-anker-blue-light: #B7E8FA;  /* fondos suaves */
 }
 
 @layer base {
   body {
-    @apply bg-slate-50 text-slate-900 antialiased;
-    font-family: var(--font-sans);
+    @apply bg-[#f0f7ff] dark:bg-[#0f1215] text-slate-900 dark:text-[#e8eaed] antialiased transition-colors duration-300;
+    background-image:
+      radial-gradient(circle at top right, rgba(0, 174, 239, 0.05), transparent),
+      radial-gradient(circle at bottom left, rgba(29, 66, 155, 0.05), transparent);
+    background-attachment: fixed;
+  }
+  *, *::before, *::after {
+    @apply transition-colors duration-300;
   }
 }
 
 .glass-card {
-  @apply bg-white/80 backdrop-blur-md border border-slate-200 shadow-xl rounded-2xl;
+  @apply bg-white/80 dark:bg-[#161b22] backdrop-blur-md border border-windmar-blue-light/30 dark:border-white/[0.08] rounded-3xl shadow-xl shadow-windmar-blue-dark/5 dark:shadow-black/20;
+}
+
+.shadow-premium {
+  box-shadow: 0 30px 60px -12px rgba(0, 174, 239, 0.20), 0 18px 36px -18px rgba(0, 0, 0, 0.3);
 }
 
 .shadow-inner-soft {
@@ -42,11 +62,11 @@
 }
 
 .custom-scrollbar::-webkit-scrollbar-track {
-  @apply bg-slate-100 rounded-full;
+  @apply bg-slate-100 dark:bg-[#1a1d25] rounded-full;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  @apply bg-slate-300 rounded-full hover:bg-slate-400 transition-colors;
+  @apply bg-slate-300 dark:bg-white/10 rounded-full hover:bg-slate-400 transition-colors;
 }
 
 @keyframes shake {
