@@ -1,8 +1,18 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <!-- Battery body -->
-  <rect x="2" y="9" width="22" height="14" rx="3" ry="3" fill="#f39200"/>
-  <!-- Battery terminal -->
-  <rect x="24" y="13" width="5" height="6" rx="1.5" ry="1.5" fill="#f39200"/>
-  <!-- Bolt inside battery -->
-  <polygon points="13,12 9,17 13,17 9,22 17,16 13,16" fill="white" opacity="0.95"/>
+  <defs>
+    <linearGradient id="bolt-grad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#00C2FF"/>
+      <stop offset="100%" stop-color="#0086B8"/>
+    </linearGradient>
+  </defs>
+  <!-- Background rounded square -->
+  <rect width="32" height="32" rx="6" fill="#0A1628"/>
+  <!-- Lightning bolt -->
+  <path
+    d="M18 3 L7 17 h7 l-2 12 L25 14 h-7 L20 3 Z"
+    fill="url(#bolt-grad)"
+    stroke="#00AEEF"
+    stroke-width="0.8"
+    stroke-linejoin="round"
+  />
 </svg>
